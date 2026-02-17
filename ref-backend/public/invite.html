@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join Ref - The Dating App Where Friends Help</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #faf5ff 0%, #f5f1ff 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 420px;
+      width: 100%;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .logo {
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+    }
+
+    .header-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 8px;
+    }
+
+    .header-subtitle {
+      font-size: 15px;
+      color: #6b7280;
+      line-height: 1.6;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #f3f4f6;
+      border-top: 3px solid #ec4899;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .profile-card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+
+    .profile-image {
+      width: 100%;
+      height: 300px;
+      background: linear-gradient(135deg, #f472b6 0%, #d8b4fe 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 80px;
+      color: white;
+      object-fit: cover;
+    }
+
+    .profile-info {
+      padding: 24px;
+      text-align: center;
+    }
+
+    .profile-name {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 8px;
+    }
+
+    .profile-bio {
+      font-size: 14px;
+      color: #6b7280;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .profile-status {
+      font-size: 13px;
+      color: #9ca3af;
+      font-weight: 500;
+    }
+
+    .info-box {
+      background: linear-gradient(135deg, #fce7f3 0%, #f3e8ff 100%);
+      border: 1px solid #fbcfe8;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+
+    .info-box-title {
+      font-weight: 600;
+      color: #1f2937;
+      font-size: 13px;
+    }
+
+    .info-box-text {
+      color: #374151;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-top: 4px;
+    }
+
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #ec4899 0%, #d946ef 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(236, 72, 153, 0.3);
+    }
+
+    .btn-secondary {
+      background: #f3f4f6;
+      color: #1f2937;
+      border: 1px solid #e5e7eb;
+    }
+
+    .btn-secondary:hover {
+      background: #ececf1;
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .footer a {
+      color: #ec4899;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .footer a:hover {
+      color: #d946ef;
+    }
+
+    .error-container {
+      text-align: center;
+      padding: 60px 20px;
+    }
+
+    .error-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 8px;
+    }
+
+    .error-message {
+      color: #6b7280;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+
+    .decoration {
+      position: fixed;
+      z-index: -1;
+      border-radius: 50%;
+      filter: blur(100px);
+      opacity: 0.2;
+    }
+
+    .decoration-1 {
+      top: -100px;
+      right: -100px;
+      width: 400px;
+      height: 400px;
+      background: #ec4899;
+    }
+
+    .decoration-2 {
+      bottom: -100px;
+      left: -100px;
+      width: 400px;
+      height: 400px;
+      background: #a855f7;
+    }
+  </style>
+</head>
+<body>
+  <div class="decoration decoration-1"></div>
+  <div class="decoration decoration-2"></div>
+
+  <div class="container">
+    <header>
+      <div class="logo">Ref</div>
+      <h1 class="header-title">You're invited!</h1>
+      <p class="header-subtitle">Join Ref, the dating app where friends help you find meaningful connections.</p>
+    </header>
+
+    <div id="content">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p class="loading-text">Loading invite...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function loadInvite() {
+      const params = new URLSearchParams(window.location.search);
+      const userId = params.get('userId');
+      const webBase = params.get('web') || `http://${window.location.hostname}:8081`;
+
+      if (!userId) {
+        showError('Invalid invite link', webBase);
+        return;
+      }
+
+      try {
+        const response = await fetch(`http://localhost:4000/profiles/${userId}`);
+        if (!response.ok) {
+          showError('User not found', webBase);
+          return;
+        }
+
+        const profile = await response.json();
+        renderProfile(profile, webBase);
+      } catch (error) {
+        console.error('Failed to load profile:', error);
+        showError('Failed to load invite', webBase);
+      }
+    }
+
+    function showError(message, webBase) {
+      document.getElementById('content').innerHTML = `
+        <div class="error-container">
+          <h2 class="error-title">Oops!</h2>
+          <p class="error-message">${message}</p>
+          <a href="${webBase}/auth/login" class="btn btn-primary">Go to Ref</a>
+        </div>
+      `;
+    }
+
+    function renderProfile(profile, webBase) {
+      const photoUrl = profile.photo || '';
+      
+      const statusEmoji = profile.relationshipStatus === 'single' ? '💕' : '📍';
+      const statusText = profile.relationshipStatus === 'single' ? 'Single' : 'In a relationship';
+
+      document.getElementById('content').innerHTML = `
+        <div class="profile-card">
+          ${photoUrl
+            ? `<div class="profile-image" style="background-image: url('${photoUrl}'); background-size: cover; background-position: center;"></div>`
+            : `<div class="profile-image">👤</div>`}
+          <div class="profile-info">
+            <div class="profile-name">${profile.name}${profile.age ? ', ' + profile.age : ''}</div>
+            ${profile.bio ? `<div class="profile-bio">${profile.bio}</div>` : ''}
+            <div class="profile-status">${statusEmoji} ${statusText}</div>
+          </div>
+        </div>
+
+        <div class="info-box">
+          <div class="info-box-title">How Ref works</div>
+          <div class="info-box-text">Friends help you find meaningful connections by introducing you to people they know or think you'd click with. Everyone's looking for something real.</div>
+        </div>
+
+        <div class="buttons">
+          <a href="https://apps.apple.com/app/ref-dating" target="_blank" class="btn btn-primary">
+            📱 Download on App Store
+          </a>
+          <a href="https://play.google.com/store/apps/details?id=com.ref.dating" target="_blank" class="btn btn-primary">
+            🤖 Get on Google Play
+          </a>
+          <a href="${webBase}/auth/login" class="btn btn-secondary">
+            ↗️ Continue on Web
+          </a>
+        </div>
+
+        <div class="footer">
+          Don't have the app yet? <a href="https://ref.app">Learn more</a>
+        </div>
+      `;
+    }
+
+    // Load invite on page load
+    window.addEventListener('DOMContentLoaded', loadInvite);
+  </script>
+</body>
+</html>
