@@ -99,6 +99,9 @@ export const AppContext = ({ children }: { children: ReactNode }) => {
     path: string,
     options?: RequestInit,
   ): Promise<T | null> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     try {
       console.log(`API Request: ${API_BASE_URL}${path}`);
       const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -107,6 +110,7 @@ export const AppContext = ({ children }: { children: ReactNode }) => {
           ...(options?.headers ?? {}),
         },
         ...options,
+        signal: controller.signal,
       });
       console.log(`API Response: ${response.status} ${response.statusText}`);
       if (!response.ok) {
@@ -115,9 +119,15 @@ export const AppContext = ({ children }: { children: ReactNode }) => {
         return null;
       }
       return (await response.json()) as T;
-    } catch (error) {
-      console.error(`API Request Failed:`, error);
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        console.error('API Request Timed Out');
+      } else {
+        console.error(`API Request Failed:`, error);
+      }
       return null;
+    } finally {
+      clearTimeout(timeoutId);
     }
   };
 
