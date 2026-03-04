@@ -22,14 +22,24 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const validatePassword = (pwd: string): { valid: boolean; message?: string } => {
+    if (pwd.length < 8) return { valid: false, message: 'At least 8 characters' };
+    if (!/[A-Z]/.test(pwd)) return { valid: false, message: 'At least 1 uppercase letter' };
+    if (!/[a-z]/.test(pwd)) return { valid: false, message: 'At least 1 lowercase letter' };
+    if (!/[0-9]/.test(pwd)) return { valid: false, message: 'At least 1 number' };
+    if (!/[!@#$%^&*]/.test(pwd)) return { valid: false, message: 'At least 1 special character (!@#$%^&*)' };
+    return { valid: true };
+  };
+
   const handleRegister = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      Alert.alert('Weak Password', passwordValidation.message);
       return;
     }
 
@@ -39,10 +49,13 @@ export default function RegisterScreen() {
       if (success) {
         router.replace('/');
       } else {
-        Alert.alert('Registration Failed', 'Email may already be registered');
+        Alert.alert(
+          'Registration Failed', 
+          'This email is already registered. Please login or use a different email.'
+        );
       }
     } catch (error) {
-      Alert.alert('Error', 'An error occurred during registration');
+      Alert.alert('Error', 'Unable to connect to the server. Please try again later.');
     } finally {
       setLoading(false);
     }

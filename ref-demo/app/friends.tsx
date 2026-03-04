@@ -86,6 +86,9 @@ export default function FriendsScreen() {
               : 'Not single'}
           </Text>
         </View>
+        <Text style={styles.contextText}>
+          Wants to connect with you
+        </Text>
       </View>
       <View style={styles.requestActions}>
         <Pressable
@@ -297,6 +300,12 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 13,
     color: Colors.textSecondary,
+  },
+  contextText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 4,
   },
   mutualText: {
     fontSize: 13,

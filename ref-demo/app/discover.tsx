@@ -9,8 +9,9 @@ import {
   Alert,
   SafeAreaView,
   FlatList,
+  Modal,
 } from 'react-native';
-import { Plus, MapPin } from 'lucide-react-native';
+import { Plus, MapPin, X } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
 import { User } from '@/types';
@@ -20,6 +21,7 @@ export default function DiscoverScreen() {
   const [profiles, setProfiles] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [addingFriendId, setAddingFriendId] = useState<string | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<User | null>(null);
 
   useEffect(() => {
     loadProfiles();
@@ -139,7 +141,7 @@ export default function DiscoverScreen() {
                 styles.addButton,
                 addingFriendId === item.id && styles.addButtonLoading
               ]}
-              onPress={() => handleAddFriend(item.id)}
+              onPress={() => setSelectedProfile(item)}
               disabled={addingFriendId === item.id}
             >
               {addingFriendId === item.id ? (
@@ -147,11 +149,62 @@ export default function DiscoverScreen() {
               ) : (
                 <Plus size={20} color={Colors.white} />
               )}
-              <Text style={styles.addButtonText}>Add Friend</Text>
+              <Text style={styles.addButtonText}>View Profile</Text>
             </Pressable>
           </View>
         )}
       />
+
+      <Modal visible={!!selectedProfile} animationType="slide" transparent>
+        {selectedProfile && (
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Pressable onPress={() => setSelectedProfile(null)}>
+                <X size={24} color={Colors.text} />
+              </Pressable>
+              <Text style={styles.modalTitle}>Profile</Text>
+              <View style={{ width: 24 }} />
+            </View>
+
+            <View style={styles.modalContent}>
+              {selectedProfile.photo && (
+                <Image
+                  source={{ uri: selectedProfile.photo }}
+                  style={styles.modalImage}
+                />
+              )}
+              <Text style={styles.modalName}>
+                {selectedProfile.name}{selectedProfile.age ? `, ${selectedProfile.age}` : ''}
+              </Text>
+              {selectedProfile.location && (
+                <View style={styles.locationRow}>
+                  <MapPin size={14} color={Colors.textSecondary} />
+                  <Text style={styles.locationText}>{selectedProfile.location}</Text>
+                </View>
+              )}
+
+              <Pressable
+                style={[
+                  styles.primaryButton,
+                  addingFriendId === selectedProfile.id && styles.buttonDisabled
+                ]}
+                onPress={() => {
+                  handleAddFriend(selectedProfile.id);
+                  setSelectedProfile(null);
+                }}
+                disabled={addingFriendId === selectedProfile.id}
+              >
+                {addingFriendId === selectedProfile.id ? (
+                  <ActivityIndicator color={Colors.white} size="small" />
+                ) : (
+                  <Plus size={18} color={Colors.white} />
+                )}
+                <Text style={styles.primaryButtonText}>Add Friend</Text>
+              </Pressable>
+            </View>
+          </SafeAreaView>
+        )}
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -170,6 +223,57 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 12,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  modalContent: {
+    flex: 1,
+    padding: 16,
+    gap: 16,
+  },
+  modalImage: {
+    width: '100%',
+    height: 400,
+    borderRadius: 16,
+  },
+  modalName: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  primaryButton: {
+    flexDirection: 'row',
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  primaryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.white,
   },
   profileCard: {
     flexDirection: 'row',

@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, Check, User } from 'lucide-react-native';
+import { Camera, Check, User, ChevronLeft } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
@@ -72,6 +72,13 @@ export default function WelcomeScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={styles.container}>
+        {step > 1 && (
+          <Pressable style={styles.backButton} onPress={() => setStep(step - 1)}>
+            <ChevronLeft size={24} color={Colors.primary} />
+            <Text style={styles.backButtonText}>Back</Text>
+          </Pressable>
+        )}
+
         {step === 1 && (
           <View style={styles.stepContainer}>
             <Text style={styles.title}>Welcome to Ref</Text>
@@ -222,9 +229,44 @@ export default function WelcomeScreen() {
                 !relationshipStatus && styles.primaryButtonDisabled,
               ]}
               disabled={!relationshipStatus}
+              onPress={() => setStep(4)}
+            >
+              <Text style={styles.primaryButtonText}>Continue</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {step === 4 && (
+          <View style={styles.stepContainer}>
+            <Text style={styles.title}>How Ref Works</Text>
+            <Text style={styles.subtitle}>
+              Two ways to find matches
+            </Text>
+
+            <View style={styles.bulletList}>
+              <View style={styles.featureBox}>
+                <Text style={styles.featureTitle}>🤝 Push</Text>
+                <Text style={styles.featureText}>
+                  You introduce two friends to each other for a match
+                </Text>
+              </View>
+              <View style={styles.featureBox}>
+                <Text style={styles.featureTitle}>💝 Pull</Text>
+                <Text style={styles.featureText}>
+                  Ask a friend to introduce you to someone they know
+                </Text>
+              </View>
+            </View>
+
+            <Pressable
+              style={[
+                styles.primaryButton,
+                !relationshipStatus && styles.primaryButtonDisabled,
+              ]}
+              disabled={!relationshipStatus}
               onPress={handleComplete}
             >
-              <Text style={styles.primaryButtonText}>Complete</Text>
+              <Text style={styles.primaryButtonText}>Get Started</Text>
             </Pressable>
           </View>
         )}
@@ -242,6 +284,19 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 24,
     justifyContent: 'center',
+    gap: 16,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+    paddingVertical: 8,
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.primary,
   },
   stepContainer: {
     gap: 24,
@@ -258,6 +313,24 @@ const styles = StyleSheet.create({
   },
   bulletList: {
     gap: 12,
+  },
+  featureBox: {
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 8,
+  },
+  featureTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  featureText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    lineHeight: 20,
   },
   bulletRow: {
     flexDirection: 'row',

@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js';
 import type { PublicUser, RelationshipStatus, SwipeDirection } from './types.js';
+import { createToken } from './middleware.js';
 
 export const store = {
   async register(
@@ -8,6 +9,8 @@ export const store = {
     name: string,
     relationshipStatus: RelationshipStatus,
   ) {
+    console.log('🔵 Register attempt:', { email, hasPassword: !!password, name });
+    
     // Create auth user
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
@@ -16,8 +19,16 @@ export const store = {
     });
 
     if (authError || !authData.user) {
-      return null;
+      console.error('❌ Auth error:', authError?.message, authError?.status, authError?.code);
+      if (authError?.code === 'user_already_exists') {
+        return null; // Will trigger 409
+      }
+      throw new Error(`Supabase auth failed: ${authError?.message || 'Unknown error'}`);
     }
+    
+    console.log('✅ Auth user created:', authData.user.id);
+    
+    console.log('✅ Auth user created:', authData.user.id);
 
     // Create profile
     const { data: profile, error: profileError } = await supabase
@@ -31,13 +42,16 @@ export const store = {
       .single();
 
     if (profileError || !profile) {
+      console.error('❌ Profile error:', profileError?.message);
       // Rollback: delete auth user
       await supabase.auth.admin.deleteUser(authData.user.id);
-      return null;
+      throw new Error(`Profile creation failed: ${profileError?.message || 'Unknown error'}`);
     }
+    
+    console.log('✅ Profile created successfully');
 
-    // Generate a simple token (user ID for now)
-    const token = authData.user.id;
+    // Generate JWT token
+    const token = createToken(authData.user.id);
 
     return {
       user: this.toPublicUser(profile),
@@ -58,9 +72,12 @@ export const store = {
     const profile = await this.getProfile(data.user.id);
     if (!profile) return null;
 
+    // Generate JWT token
+    const token = createToken(data.user.id);
+
     return {
       user: profile,
-      token: data.user.id,
+      token,
     };
   },
 

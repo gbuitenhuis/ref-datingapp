@@ -45,7 +45,7 @@ const randomInt = (min: number, max: number) =>
   Math.floor(Math.random() * (max - min + 1)) + min;
 
 const makeId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random()}`;
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://ref-backend.vercel.app';
 const AUTH_TOKEN_KEY = '@ref_auth_token';
 const USER_ID_KEY = '@ref_user_id';
 
@@ -94,6 +94,7 @@ export const AppContext = ({ children }: { children: ReactNode }) => {
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
+  const [authToken, setAuthToken] = useState<string | null>(null);
 
   const apiRequest = async <T,>(
     path: string,
@@ -104,9 +105,18 @@ export const AppContext = ({ children }: { children: ReactNode }) => {
 
     try {
       console.log(`API Request: ${API_BASE_URL}${path}`);
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      // Add authorization header for authenticated endpoints
+      if (authToken && (path.includes('/swipes') || path.includes('/profiles') && options?.method === 'PUT' || path.includes('/friends/add') || path.includes('/push') || path.includes('/pull') || path.includes('/chats'))) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+
       const response = await fetch(`${API_BASE_URL}${path}`, {
         headers: {
-          'Content-Type': 'application/json',
+          ...headers,
           ...(options?.headers ?? {}),
         },
         ...options,
@@ -158,6 +168,7 @@ export const AppContext = ({ children }: { children: ReactNode }) => {
       ]);
 
       if (storedUserId && storedToken) {
+        setAuthToken(storedToken);
         const profile = await apiRequest<ApiPublicUser>(
           `/profiles/${storedUserId}`,
         );
@@ -187,6 +198,7 @@ export const AppContext = ({ children }: { children: ReactNode }) => {
       AsyncStorage.removeItem(USER_ID_KEY),
       AsyncStorage.removeItem(AUTH_TOKEN_KEY),
     ]);
+    setAuthToken(null);
   };
 
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -204,6 +216,7 @@ export const AppContext = ({ children }: { children: ReactNode }) => {
       const user = toUser(result.user);
       setCurrentUser(user);
       setIsOnboarded(isProfileComplete(user));
+      setAuthToken(result.token);
 
       await Promise.all([
         AsyncStorage.setItem(USER_ID_KEY, user.id),
@@ -239,6 +252,7 @@ export const AppContext = ({ children }: { children: ReactNode }) => {
       const user = toUser(result.user);
       setCurrentUser(user);
       setIsOnboarded(false); // Always false for new registrations
+      setAuthToken(result.token);
 
       await Promise.all([
         AsyncStorage.setItem(USER_ID_KEY, user.id),
@@ -259,6 +273,7 @@ export const AppContext = ({ children }: { children: ReactNode }) => {
     setMatches([]);
     setPushRequests([]);
     setPullRequests([]);
+    setAuthToken(null);
   };
 
   const syncDiscoveryAndMatches = async (user: User) => {

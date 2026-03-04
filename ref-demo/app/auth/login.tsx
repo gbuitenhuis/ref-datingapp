@@ -44,11 +44,14 @@ export default function LoginScreen() {
         router.replace('/');
       } else {
         console.log('Login failed');
-        Alert.alert('Login Failed', 'Invalid email or password');
+        Alert.alert(
+          'Login Failed', 
+          'Invalid email or password. Please check your credentials and try again.'
+        );
       }
     } catch (error) {
       console.error('Login error:', error);
-      Alert.alert('Error', 'An error occurred during login');
+      Alert.alert('Error', 'Unable to connect to the server. Please try again later.');
     } finally {
       setLoading(false);
       console.log('=== LOGIN COMPLETE ===');

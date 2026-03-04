@@ -4,12 +4,15 @@ import { z } from 'zod';
 import { store } from './store-supabase.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { validateToken, createRateLimiter, errorHandler } from './middleware.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
 
+// Security & rate limiting
 app.use(cors());
+app.use(createRateLimiter());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
@@ -34,14 +37,19 @@ app.post('/auth/register', async (req, res) => {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
-  const result = await store.register(
-    parsed.data.email,
-    parsed.data.password,
-    parsed.data.name ?? '',
-    parsed.data.relationshipStatus ?? 'single',
-  );
-  if (!result) return res.status(409).json({ error: 'Email already exists' });
-  return res.status(201).json(result);
+  try {
+    const result = await store.register(
+      parsed.data.email,
+      parsed.data.password,
+      parsed.data.name ?? '',
+      parsed.data.relationshipStatus ?? 'single',
+    );
+    if (!result) return res.status(409).json({ error: 'Email already exists' });
+    return res.status(201).json(result);
+  } catch (error) {
+    console.error('❌ Registration error:', error);
+    return res.status(500).json({ error: 'Registration failed', details: String(error) });
+  }
 });
 
 app.post('/auth/login', async (req, res) => {
@@ -64,7 +72,12 @@ app.get('/profiles/:userId', async (req, res) => {
   return res.json(user);
 });
 
-app.put('/profiles/:userId', async (req, res) => {
+app.put('/profiles/:userId', validateToken, async (req, res) => {
+  // Users can only update their own profile
+  if (req.userId !== req.params.userId) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
   const schema = z.object({
     name: z.string().min(1).optional(),
     relationshipStatus: z.enum(['single', 'not-single']).optional(),
@@ -95,7 +108,7 @@ app.get('/discovery/:userId', async (req, res) => {
   return res.json({ items: users });
 });
 
-app.post('/swipes', async (req, res) => {
+app.post('/swipes', validateToken, async (req, res) => {
   const schema = z.object({
     fromUserId: z.string().min(1),
     toUserId: z.string().min(1),
@@ -104,6 +117,11 @@ app.post('/swipes', async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  // Validate the user is swiping as themselves
+  if (req.userId !== parsed.data.fromUserId) {
+    return res.status(403).json({ error: 'Unauthorized' });
   }
 
   const result = await store.addSwipe(
@@ -120,7 +138,7 @@ app.get('/matches/:userId', async (req, res) => {
   return res.json({ items: matches });
 });
 
-app.post('/friends/add', async (req, res) => {
+app.post('/friends/add', validateToken, async (req, res) => {
   const schema = z.object({
     userId: z.string().min(1),
     friendId: z.string().min(1),
@@ -128,6 +146,11 @@ app.post('/friends/add', async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  // Validate the user is adding friends as themselves
+  if (req.userId !== parsed.data.userId) {
+    return res.status(403).json({ error: 'Unauthorized' });
   }
 
   const result = await store.addFriend(parsed.data.userId, parsed.data.friendId);
@@ -140,7 +163,7 @@ app.get('/friends/:userId', async (req, res) => {
   return res.json({ items: friends });
 });
 
-app.post('/push', async (req, res) => {
+app.post('/push', validateToken, async (req, res) => {
   const schema = z.object({
     matchmakerId: z.string().min(1),
     person1Id: z.string().min(1),
@@ -149,6 +172,11 @@ app.post('/push', async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  // Validate the matchmaker is the authenticated user
+  if (req.userId !== parsed.data.matchmakerId) {
+    return res.status(403).json({ error: 'Unauthorized' });
   }
 
   const result = await store.createPushMatch(
@@ -160,7 +188,7 @@ app.post('/push', async (req, res) => {
   return res.status(201).json(result);
 });
 
-app.post('/pull', async (req, res) => {
+app.post('/pull', validateToken, async (req, res) => {
   const schema = z.object({
     requesterId: z.string().min(1),
     matchmakerId: z.string().min(1),
@@ -168,6 +196,11 @@ app.post('/pull', async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  // Validate the requester is the authenticated user
+  if (req.userId !== parsed.data.requesterId) {
+    return res.status(403).json({ error: 'Unauthorized' });
   }
 
   const result = await store.createPullRequest(
@@ -184,7 +217,7 @@ app.get('/chats/:matchId/messages', async (req, res) => {
   return res.json({ items: messages });
 });
 
-app.post('/chats/:matchId/messages', async (req, res) => {
+app.post('/chats/:matchId/messages', validateToken, async (req, res) => {
   const schema = z.object({
     senderId: z.string().min(1),
     text: z.string().min(1).max(1000),
@@ -192,6 +225,11 @@ app.post('/chats/:matchId/messages', async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  // Validate the sender is the authenticated user
+  if (req.userId !== parsed.data.senderId) {
+    return res.status(403).json({ error: 'Unauthorized' });
   }
 
   const message = await store.addMessage(
@@ -202,6 +240,8 @@ app.post('/chats/:matchId/messages', async (req, res) => {
   if (!message) return res.status(404).json({ error: 'Match not found' });
   return res.status(201).json(message);
 });
+
+app.use(errorHandler);
 
 app.listen(port, () => {
   // eslint-disable-next-line no-console

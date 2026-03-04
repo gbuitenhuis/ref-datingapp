@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Heart, UserCheck, UserPlus, Users } from 'lucide-react-native';
+import { Heart, UserCheck, UserPlus, Users, Flag } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
 import { Friend, User } from '@/types';
@@ -141,6 +141,29 @@ export default function FriendDetailScreen() {
           </Pressable>
         </View>
       )}
+
+      <Pressable
+        style={styles.reportButton}
+        onPress={() => {
+          Alert.alert(
+            'Report User',
+            'Are you sure you want to report this user for inappropriate behavior?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Report',
+                style: 'destructive',
+                onPress: () => {
+                  Alert.alert('Report Submitted', 'Thank you for helping keep Ref safe. Our team will review this report.');
+                },
+              },
+            ]
+          );
+        }}
+      >
+        <Flag size={16} color={Colors.accent} />
+        <Text style={styles.reportText}>Report User</Text>
+      </Pressable>
 
       {alreadyFriends ? (
         <View style={styles.section}>
@@ -306,6 +329,23 @@ const styles = StyleSheet.create({
   actionSubtitle: {
     fontSize: 13,
     color: Colors.textSecondary,
+  },
+  reportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    marginTop: 16,
+  },
+  reportText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.accent,
   },
   section: {
     gap: 12,
