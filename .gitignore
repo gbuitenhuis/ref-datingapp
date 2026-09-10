@@ -1,0 +1,32 @@
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+ref-demo/node_modules/
+ref-backend/node_modules/
+
+# Build output
+ref-demo/dist/
+ref-backend/dist/
+.expo/
+
+# OS
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# Claude internal
+.claude/
+
+# Vercel
+.vercel/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Marketing / non-code
+"Ref marketing/"

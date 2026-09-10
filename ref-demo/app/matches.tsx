@@ -1,178 +1,190 @@
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import { Heart, MessageCircle } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
+import { AppTabBar } from '@/components/AppTabBar';
+import { Avatar } from '@/components/ui/Avatar';
 
 export default function MatchesScreen() {
-  const { matches } = useApp();
-  const completedMatches = matches.filter((match) => match.status === 'matched');
+  const { matches, refreshFriends } = useApp();
+  const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
+  const completedMatches = matches.filter((m) => m.status === 'matched');
+  const displayName = (name?: string) => name?.trim() || 'Unnamed';
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshFriends();
+    setRefreshing(false);
+  };
 
   if (completedMatches.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
-        <Heart size={64} color={Colors.textSecondary} />
-        <Text style={styles.emptyTitle}>No matches yet</Text>
-        <Text style={styles.emptySubtitle}>
-          When someone you like likes you back, they will appear here
-        </Text>
-      </View>
+      <SafeAreaView style={styles.screen}>
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyIconWrap}>
+            <Heart size={28} color={Colors.brand} />
+          </View>
+          <Text style={styles.emptyTitle}>No matches yet</Text>
+          <Text style={styles.emptySub}>
+            When someone you like likes you back, they'll appear here.
+          </Text>
+        </View>
+        <AppTabBar />
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.headerText}>
-        You have {completedMatches.length} match
-        {completedMatches.length === 1 ? '' : 'es'}
-      </Text>
+    <SafeAreaView style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={Colors.brand} />}
+      >
+        <View style={styles.pageHeader}>
+          <View style={styles.pageIconWrap}>
+            <Heart size={18} color={Colors.brand} />
+          </View>
+          <View>
+            <Text style={styles.pageTitle}>Matches</Text>
+            <Text style={styles.pageCount}>
+              {completedMatches.length} match{completedMatches.length === 1 ? '' : 'es'}
+            </Text>
+          </View>
+        </View>
 
-      {completedMatches.map((match) => (
-        <View key={match.id} style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Image source={{ uri: match.user.photo }} style={styles.avatar} />
-            <View style={styles.cardInfo}>
-              <Text style={styles.name}>{match.user.name}</Text>
-              <View style={styles.matchBadge}>
-                <Heart size={12} color={Colors.white} fill={Colors.white} />
-                <Text style={styles.badgeText}>Matched by {match.matchedBy.name}</Text>
+        {completedMatches.map((match) => (
+          <View key={match.id} style={styles.card}>
+            <View style={styles.cardTop}>
+              <Avatar photo={match.user.photo} name={match.user.name} userId={match.user.id} size="lg" ring />
+              <View style={styles.cardInfo}>
+                <Text style={styles.cardName}>{displayName(match.user.name)}</Text>
+                {match.user.age ? <Text style={styles.cardAge}>{match.user.age}</Text> : null}
+                <View style={styles.matchBadge}>
+                  <Heart size={11} color={Colors.white} fill={Colors.white} />
+                  <Text style={styles.badgeText}>via {displayName(match.matchedBy.name)}</Text>
+                </View>
+                {match.user.relationshipStatus === 'single' ? (
+                  <View style={styles.singleBadge}>
+                    <View style={styles.singleDot} />
+                    <Text style={styles.singleText}>Single</Text>
+                  </View>
+                ) : null}
               </View>
             </View>
+
+            {match.user.bio ? (
+              <Text style={styles.bio}>{match.user.bio}</Text>
+            ) : null}
+
+            <View style={styles.actionsRow}>
+              <Pressable
+                style={styles.primaryBtn}
+                onPress={() => router.push({
+                  pathname: '/chat',
+                  params: {
+                    matchId: match.id,
+                    otherName: match.user.name,
+                    otherPhoto: match.user.photo ?? '',
+                    otherUserId: match.user.id,
+                  },
+                })}
+              >
+                <MessageCircle size={15} color={Colors.white} />
+                <Text style={styles.primaryBtnText}>Send Message</Text>
+              </Pressable>
+            </View>
           </View>
-
-          {match.user.bio ? (
-            <Text style={styles.bio}>{match.user.bio}</Text>
-          ) : null}
-
-          <View style={styles.actionsRow}>
-            <Pressable style={styles.primaryButton}>
-              <MessageCircle size={16} color={Colors.white} />
-              <Text style={styles.primaryButtonText}>Send Message</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>View Profile</Text>
-            </Pressable>
-          </View>
-
-          <Text style={styles.note}>
-            This is a prototype. Messaging will be available in the full version.
-          </Text>
-        </View>
-      ))}
-    </ScrollView>
+        ))}
+      </ScrollView>
+      <AppTabBar />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 24,
+  screen: { flex: 1, backgroundColor: Colors.background },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 120,
     gap: 16,
-    backgroundColor: Colors.background,
+    maxWidth: 680,
+    width: '100%',
+    alignSelf: 'center',
   },
-  headerText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.text,
+
+  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
+  emptyIconWrap: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: Colors.brandLight, borderWidth: 1, borderColor: Colors.brandBorder,
+    alignItems: 'center', justifyContent: 'center',
   },
+  emptyTitle: { fontSize: 22, fontWeight: '700', color: Colors.text },
+  emptySub: { fontSize: 15, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+
+  pageHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
+  pageIconWrap: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: Colors.brandLight, borderWidth: 1, borderColor: Colors.brandBorder,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  pageTitle: { fontSize: 24, fontWeight: '700', color: Colors.text, letterSpacing: -0.4 },
+  pageCount: { fontSize: 13, color: Colors.textSecondary, marginTop: 1 },
+
   card: {
-    backgroundColor: Colors.white,
-    borderRadius: 20,
-    padding: 20,
-    gap: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    padding: 18,
+    gap: 14,
+    shadowColor: Colors.black,
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-  },
-  cardInfo: {
-    flex: 1,
-    gap: 6,
-  },
-  name: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.text,
-  },
+  cardTop: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
+  cardInfo: { flex: 1, gap: 6, paddingTop: 4 },
+  cardName: { fontSize: 20, fontWeight: '700', color: Colors.text, letterSpacing: -0.2 },
+  cardAge: { fontSize: 14, color: Colors.textSecondary },
   matchBadge: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.secondary,
+    gap: 5,
+    backgroundColor: Colors.brand,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 99,
   },
-  badgeText: {
-    fontSize: 12,
-    color: Colors.white,
-  },
-  bio: {
-    fontSize: 15,
-    color: Colors.text,
-    lineHeight: 22,
-  },
-  actionsRow: {
+  badgeText: { fontSize: 11, fontWeight: '700', color: Colors.white },
+  singleBadge: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
-    gap: 12,
-  },
-  primaryButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: Colors.secondary,
-    justifyContent: 'center',
     alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  primaryButtonText: {
-    color: Colors.white,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 99,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#EDFDF5',
+    borderColor: '#A7EAC6',
   },
-  secondaryButtonText: {
-    color: Colors.text,
-    fontWeight: '600',
+  singleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.success },
+  singleText: { fontSize: 11, fontWeight: '700', color: Colors.success },
+  bio: { fontSize: 14, color: Colors.textSecondary, lineHeight: 21 },
+  actionsRow: { flexDirection: 'row', gap: 10 },
+  primaryBtn: {
+    flex: 1, height: 48, borderRadius: 12,
+    backgroundColor: Colors.brand,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    shadowColor: Colors.brand, shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2,
   },
-  note: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontStyle: 'italic',
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.background,
-    gap: 8,
-    padding: 24,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
+  primaryBtnText: { color: Colors.white, fontSize: 14, fontWeight: '700' },
 });

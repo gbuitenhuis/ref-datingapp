@@ -1,375 +1,550 @@
-import { useEffect } from 'react';
-import { SectionList, StyleSheet, Text, View, Image, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Check, UserPlus, Users, X } from 'lucide-react-native';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text } from '@/components/ui/Text';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Check, ChevronLeft, ChevronRight, Link as LinkIcon, Search, Users, X } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
-import { Friend, FriendRequest, User } from '@/types';
+import { AppTabBar } from '@/components/AppTabBar';
+import { Avatar } from '@/components/ui/Avatar';
+import { useToast } from '@/context/ToastContext';
+import { Friend } from '@/types';
 
-interface SectionItem {
-  title: string;
-  data: Array<Friend | FriendRequest | User>;
-  type: 'requests' | 'pending' | 'friends' | 'suggestions' | 'empty';
-}
+type FlowMode = 'introduce' | 'get-introduced' | undefined;
 
 export default function FriendsScreen() {
   const router = useRouter();
+  const { showToast } = useToast();
+  const params = useLocalSearchParams<{
+    connected?: string | string[];
+    mode?: string | string[];
+    selectedFriendId?: string | string[];
+  }>();
   const {
     friends,
     friendRequests,
-    outgoingRequests,
-    suggestedFriends,
     refreshFriends,
     acceptFriendRequest,
     declineFriendRequest,
+    createPushRequest,
+    createPullRequest,
+    sendFriendRequest,
+    findFriendByPhone,
+    areFriends,
+    isRequestPending,
   } = useApp();
+  const [submitting, setSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [phoneQuery, setPhoneQuery] = useState('');
+  const [phoneResult, setPhoneResult] = useState<import('@/types').User | null>(null);
+  const [phoneSearching, setPhoneSearching] = useState(false);
+  const [phoneNotFound, setPhoneNotFound] = useState(false);
 
-  useEffect(() => {
-    void refreshFriends();
-  }, [refreshFriends]);
+  const connectedName = Array.isArray(params.connected) ? params.connected[0] : params.connected;
+  const mode = (Array.isArray(params.mode) ? params.mode[0] : params.mode) as FlowMode;
+  const selectedFriendId = Array.isArray(params.selectedFriendId)
+    ? params.selectedFriendId[0]
+    : params.selectedFriendId;
 
-  const sections: SectionItem[] = [];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void refreshFriends(); }, []);
 
-  if (friendRequests.length > 0) {
-    sections.push({
-      title: 'Friend Requests',
-      data: friendRequests,
-      type: 'requests',
-    });
-  }
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshFriends();
+    setRefreshing(false);
+  };
 
-  if (outgoingRequests.length > 0) {
-    sections.push({
-      title: 'Pending Requests',
-      data: outgoingRequests,
-      type: 'pending',
-    });
-  }
+  const getDisplayName = (f: Friend) => f.name?.trim() || 'Someone';
+  const getStatusLabel = (f: Friend) =>
+    f.name?.trim()
+      ? f.relationshipStatus === 'single' ? 'Single' : 'Not single'
+      : 'Profile not completed yet';
 
-  sections.push({
-    title: `Friends (${friends.length})`,
-    data: friends,
-    type: 'friends',
-  });
-
-  if (suggestedFriends.length > 0) {
-    sections.push({
-      title: 'People You Might Know',
-      data: suggestedFriends,
-      type: 'suggestions',
-    });
-  }
-
-  const isEmpty =
-    friendRequests.length === 0 &&
-    outgoingRequests.length === 0 &&
-    friends.length === 0 &&
-    suggestedFriends.length === 0;
-
-  const renderRequest = (request: FriendRequest) => (
-    <View style={styles.requestCard}>
-      <Image source={{ uri: request.from.photo }} style={styles.avatar} />
-      <View style={styles.cardInfo}>
-        <Text style={styles.name}>{request.from.name}</Text>
-        <View style={styles.statusRow}>
-          <View
-            style={[
-              styles.statusDot,
-              request.from.relationshipStatus === 'single'
-                ? styles.dotSingle
-                : styles.dotMatchmaker,
-            ]}
-          />
-          <Text style={styles.statusText}>
-            {request.from.relationshipStatus === 'single'
-              ? 'Single'
-              : 'Not single'}
-          </Text>
-        </View>
-        <Text style={styles.contextText}>
-          Wants to connect with you
-        </Text>
-      </View>
-      <View style={styles.requestActions}>
-        <Pressable
-          style={[styles.actionCircle, styles.actionAccept]}
-          onPress={() => acceptFriendRequest(request.id)}
-        >
-          <Check size={18} color={Colors.white} />
-        </Pressable>
-        <Pressable
-          style={[styles.actionCircle, styles.actionDecline]}
-          onPress={() => declineFriendRequest(request.id)}
-        >
-          <X size={18} color={Colors.secondary} />
-        </Pressable>
-      </View>
-    </View>
+  const sortedFriends = useMemo(
+    () =>
+      [...friends].sort((a, b) => {
+        const aHas = Boolean(a.name?.trim());
+        const bHas = Boolean(b.name?.trim());
+        if (aHas !== bHas) return aHas ? -1 : 1;
+        return getDisplayName(a).localeCompare(getDisplayName(b));
+      }),
+    [friends],
   );
 
-  const renderPending = (request: FriendRequest) => (
-    <View style={[styles.card, styles.pendingCard]}>
-      <Image source={{ uri: request.to.photo }} style={styles.avatar} />
-      <View style={styles.cardInfo}>
-        <Text style={styles.name}>{request.to.name}</Text>
-        <Text style={styles.pendingText}>Request pending</Text>
-      </View>
-    </View>
+  const selectedFriend = useMemo(
+    () => sortedFriends.find((f) => f.id === selectedFriendId) ?? null,
+    [sortedFriends, selectedFriendId],
   );
 
-  const renderFriend = (friend: Friend) => (
-    <Pressable
-      style={styles.card}
-      onPress={() => router.push(`/friend-detail?id=${friend.id}`)}
-    >
-      <Image source={{ uri: friend.photo }} style={styles.avatar} />
-      <View style={styles.cardInfo}>
-        <Text style={styles.name}>{friend.name}</Text>
-        <View style={styles.statusRow}>
-          <View
-            style={[
-              styles.statusDot,
-              friend.relationshipStatus === 'single'
-                ? styles.dotSingle
-                : styles.dotMatchmaker,
-            ]}
-          />
-          <Text style={styles.statusText}>
-            {friend.relationshipStatus === 'single' ? 'Single' : 'Not single'}
-          </Text>
-        </View>
-        {!!friend.mutualFriendsCount && friend.mutualFriendsCount > 0 && (
-          <Text style={styles.mutualText}>
-            {friend.mutualFriendsCount} mutual friend
-            {friend.mutualFriendsCount === 1 ? '' : 's'}
-          </Text>
-        )}
-      </View>
-    </Pressable>
-  );
+  const listFriends = useMemo(() => {
+    let base = sortedFriends;
+    if (mode === 'introduce' && selectedFriendId) {
+      base = base.filter((f) => f.id !== selectedFriendId);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      base = base.filter((f) => getDisplayName(f).toLowerCase().includes(q));
+    }
+    return base;
+  }, [mode, selectedFriendId, sortedFriends, searchQuery]);
 
-  const renderSuggestion = (user: Friend) => (
-    <Pressable
-      style={styles.card}
-      onPress={() =>
-        router.push(`/friend-detail?id=${user.id}&suggestion=true`)
+  const clearFlow = () => router.replace('/friends');
+
+  const handleFriendPress = async (friend: Friend) => {
+    if (!mode) {
+      router.push({ pathname: '/friend-detail', params: { id: friend.id } });
+      return;
+    }
+    if (submitting) return;
+
+    if (mode === 'introduce') {
+      if (!selectedFriend) {
+        router.replace({ pathname: '/friends', params: { mode: 'introduce', selectedFriendId: friend.id } });
+        return;
       }
-    >
-      <Image source={{ uri: user.photo }} style={styles.avatar} />
-      <View style={styles.cardInfo}>
-        <Text style={styles.name}>{user.name}</Text>
-        <View style={styles.statusRow}>
-          <View
-            style={[
-              styles.statusDot,
-              user.relationshipStatus === 'single'
-                ? styles.dotSingle
-                : styles.dotMatchmaker,
-            ]}
-          />
-          <Text style={styles.statusText}>
-            {user.relationshipStatus === 'single' ? 'Single' : 'Not single'}
-          </Text>
-        </View>
-        {!!user.mutualFriendsCount && (
-          <Text style={styles.mutualText}>
-            {user.mutualFriendsCount} mutual friend
-            {user.mutualFriendsCount === 1 ? '' : 's'}
-          </Text>
-        )}
-      </View>
-      <Pressable style={styles.addButton}>
-        <UserPlus size={18} color={Colors.secondary} />
-      </Pressable>
-    </Pressable>
-  );
+      setSubmitting(true);
+      const ok = await createPushRequest(selectedFriend, [friend]);
+      setSubmitting(false);
+      if (!ok) { showToast('Could not create the introduction — please try again', 'error'); return; }
+      showToast(`Introduction sent to ${getDisplayName(selectedFriend)} 🎉`, 'success');
+      clearFlow();
+      return;
+    }
 
-  if (isEmpty) {
+    if (mode === 'get-introduced') {
+      setSubmitting(true);
+      const ok = await createPullRequest(friend);
+      setSubmitting(false);
+      if (!ok) { showToast('Could not send this request — please try again', 'error'); return; }
+      showToast(`${getDisplayName(friend)} can now introduce you 🎉`, 'success');
+      clearFlow();
+    }
+  };
+
+  const handlePhoneSearch = async () => {
+    const q = phoneQuery.trim();
+    if (!q || phoneSearching) return;
+    setPhoneResult(null);
+    setPhoneNotFound(false);
+    setPhoneSearching(true);
+    const user = await findFriendByPhone(q);
+    setPhoneSearching(false);
+    if (user) { setPhoneResult(user); }
+    else { setPhoneNotFound(true); }
+  };
+
+  const handleAddPhoneResult = async () => {
+    if (!phoneResult || submitting) return;
+    setSubmitting(true);
+    const ok = await sendFriendRequest(phoneResult);
+    setSubmitting(false);
+    if (ok) {
+      showToast(`Friend request sent to ${phoneResult.name || 'user'} 🎉`, 'success');
+      setPhoneResult(null);
+      setPhoneQuery('');
+    } else {
+      showToast('Could not send request — they may already be in your network', 'error');
+    }
+  };
+
+  const isFullyEmpty = sortedFriends.length === 0 && friendRequests.length === 0;
+
+  if (isFullyEmpty) {
     return (
-      <View style={[styles.container, styles.emptyContainer]}>
-        <Users size={64} color={Colors.textSecondary} />
-        <Text style={styles.emptyTitle}>No friends yet</Text>
-        <Text style={styles.emptySubtitle}>
-          Share your invite link or scan QR codes to connect with friends
-        </Text>
-        <Pressable
-          style={styles.primaryButton}
-          onPress={() => router.push('/invite')}
-        >
-          <Text style={styles.primaryButtonText}>Invite Friends</Text>
-        </Pressable>
-      </View>
+      <SafeAreaView style={styles.screen}>
+        <View style={styles.emptyState}>
+          <Text style={styles.pageTitle}>Friends</Text>
+          <Text style={styles.emptyStateText}>
+            Invite people you know to start making introductions.
+          </Text>
+          <Pressable style={styles.inviteBtn} onPress={() => router.push('/invite')}>
+            <LinkIcon size={15} color={Colors.white} />
+            <Text style={styles.inviteBtnText}>Invite friends</Text>
+          </Pressable>
+        </View>
+        <AppTabBar />
+      </SafeAreaView>
     );
   }
 
   return (
-    <SectionList
-      sections={sections}
-      keyExtractor={(item, index) => `${index}-${(item as any).id ?? 'item'}`}
-      contentContainerStyle={styles.container}
-      renderSectionHeader={({ section }) => (
-        <Text style={styles.sectionTitle}>{section.title}</Text>
-      )}
-      renderItem={({ item, section }) => {
-        if (section.type === 'requests') {
-          return renderRequest(item as FriendRequest);
-        }
-        if (section.type === 'pending') {
-          return renderPending(item as FriendRequest);
-        }
-        if (section.type === 'friends') {
-          return renderFriend(item as Friend);
-        }
-        if (section.type === 'suggestions') {
-          return renderSuggestion(item as Friend);
-        }
-        return null;
-      }}
-    />
+    <SafeAreaView style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={Colors.brand} />}
+      >
+
+        {/* Success banner */}
+        {connectedName ? (
+          <View style={styles.successBanner}>
+            <Text style={styles.successTitle}>Connected with {connectedName}</Text>
+            <Text style={styles.successText}>You are now in each other's network.</Text>
+          </View>
+        ) : null}
+
+        {/* Normal mode */}
+        {!mode && (
+          <>
+            <View style={styles.pageHeader}>
+              <View style={styles.pageTitleGroup}>
+                <Text style={styles.wordmark}>Ref.</Text>
+                <Text style={styles.pageTitle}>Friends</Text>
+                <Text style={styles.pageSubtitle}>Your network</Text>
+              </View>
+              <View style={styles.pageActions}>
+                <Pressable style={styles.actionChip} onPress={() => router.push('/discover')}>
+                  <Users size={13} color={Colors.textSecondary} />
+                  <Text style={styles.actionChipText}>Discover</Text>
+                </Pressable>
+                <Pressable style={styles.actionChipPrimary} onPress={() => router.push('/invite')}>
+                  <LinkIcon size={13} color={Colors.white} />
+                  <Text style={styles.actionChipPrimaryText}>Invite</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Search bar */}
+            {sortedFriends.length >= 5 && (
+              <View style={styles.searchWrap}>
+                <Search size={15} color={Colors.textTertiary} style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search friends…"
+                  placeholderTextColor={Colors.textTertiary}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  clearButtonMode="while-editing"
+                />
+              </View>
+            )}
+
+            {/* Find by phone */}
+            <View style={styles.phoneSection}>
+              <Text style={styles.sectionLabel}>Find by phone number</Text>
+              <View style={styles.phoneRow}>
+                <TextInput
+                  style={styles.phoneInput}
+                  placeholder="+31 6 12345678"
+                  placeholderTextColor={Colors.textTertiary}
+                  value={phoneQuery}
+                  onChangeText={(v) => { setPhoneQuery(v); setPhoneResult(null); setPhoneNotFound(false); }}
+                  keyboardType="phone-pad"
+                  autoComplete="tel"
+                  onSubmitEditing={() => void handlePhoneSearch()}
+                  returnKeyType="search"
+                />
+                <Pressable
+                  style={[styles.phoneSearchBtn, (!phoneQuery.trim() || phoneSearching) && styles.phoneSearchBtnDisabled]}
+                  onPress={() => void handlePhoneSearch()}
+                  disabled={!phoneQuery.trim() || phoneSearching}
+                >
+                  {phoneSearching
+                    ? <ActivityIndicator size="small" color={Colors.white} />
+                    : <Text style={styles.phoneSearchBtnText}>Find</Text>}
+                </Pressable>
+              </View>
+              {phoneResult && (
+                <View style={styles.row}>
+                  <Avatar photo={phoneResult.photo} name={phoneResult.name} userId={phoneResult.id} size="sm" />
+                  <View style={styles.rowInfo}>
+                    <Text style={styles.rowName}>{phoneResult.name?.trim() || 'Ref user'}</Text>
+                    <Text style={styles.rowSub}>
+                      {areFriends(phoneResult.id) ? 'Already friends' : isRequestPending(phoneResult.id) ? 'Request sent' : 'Found on Ref'}
+                    </Text>
+                  </View>
+                  {!areFriends(phoneResult.id) && !isRequestPending(phoneResult.id) && (
+                    <Pressable
+                      style={styles.acceptBtn}
+                      onPress={() => void handleAddPhoneResult()}
+                      disabled={submitting}
+                    >
+                      {submitting
+                        ? <ActivityIndicator size="small" color={Colors.white} />
+                        : <Check size={14} color={Colors.white} />}
+                    </Pressable>
+                  )}
+                </View>
+              )}
+              {phoneNotFound && (
+                <Text style={styles.emptyText}>No Ref user found with that number</Text>
+              )}
+            </View>
+
+            {listFriends.length > 0 ? listFriends.map((f, i) => (
+              <Fragment key={f.id}>
+                <Pressable
+                  style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+                  onPress={() => void handleFriendPress(f)}
+                >
+                  <Avatar photo={f.photo} name={f.name} userId={f.id} size="sm" />
+                  <View style={styles.rowInfo}>
+                    <Text style={styles.rowName}>{getDisplayName(f)}</Text>
+                    <Text style={styles.rowSub}>{getStatusLabel(f)}</Text>
+                  </View>
+                  <ChevronRight size={15} color={Colors.textTertiary} />
+                </Pressable>
+                {i < listFriends.length - 1 && <View style={styles.divider} />}
+              </Fragment>
+            )) : (
+              <Text style={styles.emptyText}>
+                {searchQuery.trim() ? 'No friends match your search' : 'No friends yet'}
+              </Text>
+            )}
+
+            {/* Friend requests */}
+            {friendRequests.length > 0 && (
+              <View style={styles.requestsSection}>
+                <Text style={styles.sectionLabel}>
+                  Requests ({friendRequests.length})
+                </Text>
+                {friendRequests.map((req, i) => (
+                  <Fragment key={req.id}>
+                    <View style={styles.row}>
+                      <Avatar photo={req.from.photo} name={req.from.name} userId={req.from.id} size="sm" />
+                      <View style={styles.rowInfo}>
+                        <Text style={styles.rowName}>{getDisplayName(req.from)}</Text>
+                        <Text style={styles.rowSub}>{getStatusLabel(req.from)}</Text>
+                      </View>
+                      <View style={styles.requestActions}>
+                        <Pressable
+                          style={styles.acceptBtn}
+                          onPress={() => acceptFriendRequest(req.id)}
+                          hitSlop={{ top: 12, bottom: 12, left: 12, right: 6 }}
+                        >
+                          <Check size={14} color={Colors.white} />
+                        </Pressable>
+                        <Pressable
+                          style={styles.declineBtn}
+                          onPress={() => declineFriendRequest(req.id)}
+                          hitSlop={{ top: 12, bottom: 12, left: 6, right: 12 }}
+                        >
+                          <X size={14} color={Colors.textSecondary} />
+                        </Pressable>
+                      </View>
+                    </View>
+                    {i < friendRequests.length - 1 && <View style={styles.divider} />}
+                  </Fragment>
+                ))}
+              </View>
+            )}
+          </>
+        )}
+
+        {/* Flow mode */}
+        {mode && (
+          <>
+            <Pressable style={styles.backNav} onPress={clearFlow}>
+              <ChevronLeft size={18} color={Colors.textSecondary} />
+              <Text style={styles.backNavText}>Cancel</Text>
+            </Pressable>
+            <View style={styles.flowHeader}>
+              <Text style={styles.pageTitle}>
+                {mode === 'introduce'
+                  ? selectedFriend ? 'Choose another friend' : 'Choose a friend'
+                  : 'Choose a friend'}
+              </Text>
+              <Text style={styles.flowDesc}>
+                {mode === 'introduce'
+                  ? selectedFriend
+                    ? `Set up with ${getDisplayName(selectedFriend)}.`
+                    : 'Pick the first friend you want to help.'
+                  : 'Pick someone who can introduce you.'}
+              </Text>
+              {selectedFriend && (
+                <View style={styles.selectedRow}>
+                  <Avatar photo={selectedFriend.photo} name={selectedFriend.name} userId={selectedFriend.id} size="sm" />
+                  <View style={styles.rowInfo}>
+                    <Text style={styles.rowName}>{getDisplayName(selectedFriend)}</Text>
+                    <Text style={styles.rowSub}>Selected</Text>
+                  </View>
+                  <Pressable onPress={clearFlow}>
+                    <Text style={styles.changeText}>Change</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.flowSection}>
+              <Text style={styles.sectionLabel}>Your friends</Text>
+              {listFriends.map((f, i) => (
+                <Fragment key={f.id}>
+                  <Pressable
+                    style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+                    onPress={() => void handleFriendPress(f)}
+                  >
+                    <Avatar photo={f.photo} name={f.name} userId={f.id} size="sm" />
+                    <View style={styles.rowInfo}>
+                      <Text style={styles.rowName}>{getDisplayName(f)}</Text>
+                      <Text style={styles.rowSub}>{getStatusLabel(f)}</Text>
+                    </View>
+                    {submitting
+                      ? <ActivityIndicator size="small" color={Colors.brand} />
+                      : <ChevronRight size={15} color={Colors.brand} />}
+                  </Pressable>
+                  {i < listFriends.length - 1 && <View style={styles.divider} />}
+                </Fragment>
+              ))}
+            </View>
+          </>
+        )}
+
+      </ScrollView>
+      <AppTabBar />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 24,
-    gap: 16,
-    backgroundColor: Colors.background,
+  screen: { flex: 1, backgroundColor: Colors.background },
+  content: {
+    paddingHorizontal: 22,
+    paddingTop: 24,
+    paddingBottom: 120,
+    gap: 0,
+    maxWidth: 680,
+    width: '100%',
+    alignSelf: 'center',
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.text,
+
+  pageHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginBottom: 28,
+  },
+  pageTitleGroup: { gap: 2 },
+  wordmark: { fontSize: 16, fontWeight: '800', color: Colors.brand, letterSpacing: -0.2 },
+  pageTitle: { fontSize: 30, fontWeight: '700', color: Colors.text, letterSpacing: -0.5 },
+  pageSubtitle: { fontSize: 13, color: Colors.textSecondary },
+  pageActions: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingBottom: 4 },
+
+  actionChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    height: 44, paddingHorizontal: 14, borderRadius: 12,
+    borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+  },
+  actionChipText: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
+  actionChipPrimary: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    height: 44, paddingHorizontal: 14, borderRadius: 12,
+    backgroundColor: Colors.brand,
+  },
+  actionChipPrimaryText: { fontSize: 12, fontWeight: '600', color: Colors.white },
+
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 13,
+  },
+  rowPressed: { opacity: 0.65 },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border },
+  rowInfo: { flex: 1, gap: 2 },
+  rowName: { fontSize: 15, fontWeight: '600', color: Colors.text },
+  rowSub: { fontSize: 13, color: Colors.textSecondary },
+
+  emptyText: { fontSize: 14, color: Colors.textTertiary, paddingTop: 4 },
+
+  sectionLabel: {
+    fontSize: 11, fontWeight: '700',
+    color: Colors.textSecondary,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 14,
+  },
+
+  requestsSection: { marginTop: 36 },
+  requestActions: { flexDirection: 'row', gap: 8 },
+  acceptBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: Colors.brand,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  declineBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: Colors.surfaceMuted,
+    borderWidth: 1, borderColor: Colors.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  flowHeader: { gap: 8, marginBottom: 32 },
+  flowDesc: { fontSize: 15, color: Colors.textSecondary, lineHeight: 21 },
+  flowSection: {},
+  selectedRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
     marginTop: 12,
-    marginBottom: 8,
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
   },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 16,
-    borderRadius: 16,
+  changeText: { fontSize: 13, fontWeight: '600', color: Colors.brand },
+  backNav: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginBottom: 16 },
+  backNavText: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
+
+  successBanner: {
+    marginBottom: 28,
+    padding: 16, borderRadius: 14,
+    backgroundColor: Colors.successLight,
+    borderWidth: 1, borderColor: Colors.successBorder,
+    gap: 3,
+  },
+  successTitle: { fontSize: 14, fontWeight: '700', color: Colors.text },
+  successText: { fontSize: 13, color: Colors.textSecondary },
+
+  emptyState: {
+    flex: 1, paddingHorizontal: 24, paddingTop: 60, gap: 14,
+  },
+  emptyStateText: { fontSize: 15, color: Colors.textSecondary, lineHeight: 22, maxWidth: 280 },
+  inviteBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    alignSelf: 'flex-start',
+    height: 44, paddingHorizontal: 18, borderRadius: 12,
+    backgroundColor: Colors.brand, marginTop: 4,
+  },
+  inviteBtnText: { fontSize: 14, fontWeight: '700', color: Colors.white },
+
+  phoneSection: { marginBottom: 24, gap: 10 },
+  phoneRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  phoneInput: {
+    flex: 1, height: 44, borderRadius: 12,
     backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 12,
+    borderWidth: 1, borderColor: Colors.border,
+    paddingHorizontal: 14,
+    fontSize: 15, color: Colors.text,
   },
-  requestCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: Colors.white,
-    borderWidth: 2,
-    borderColor: Colors.secondary,
-    marginBottom: 12,
+  phoneSearchBtn: {
+    height: 44, paddingHorizontal: 16, borderRadius: 12,
+    backgroundColor: Colors.brand, justifyContent: 'center', alignItems: 'center',
   },
-  pendingCard: {
+  phoneSearchBtnDisabled: { opacity: 0.5 },
+  phoneSearchBtnText: { fontSize: 14, fontWeight: '700', color: Colors.white },
+
+  searchWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    height: 44, borderRadius: 12,
     backgroundColor: Colors.surface,
+    borderWidth: 1, borderColor: Colors.border,
+    paddingHorizontal: 12,
+    marginBottom: 16,
   },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-  },
-  cardInfo: {
+  searchIcon: { flexShrink: 0 },
+  searchInput: {
     flex: 1,
-    gap: 6,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  dotSingle: {
-    backgroundColor: Colors.success,
-  },
-  dotMatchmaker: {
-    backgroundColor: Colors.accent,
-  },
-  statusText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  contextText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontStyle: 'italic',
-    marginTop: 4,
-  },
-  mutualText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  requestActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  actionCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionAccept: {
-    backgroundColor: Colors.success,
-  },
-  actionDecline: {
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  pendingText: {
     fontSize: 14,
-    fontStyle: 'italic',
-    color: Colors.textSecondary,
-  },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.white,
-    borderWidth: 2,
-    borderColor: Colors.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    padding: 24,
-    gap: 12,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
     color: Colors.text,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
-  primaryButton: {
-    height: 48,
-    paddingHorizontal: 24,
-    backgroundColor: Colors.secondary,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: Colors.white,
-    fontWeight: '600',
+    paddingVertical: 0,
   },
 });

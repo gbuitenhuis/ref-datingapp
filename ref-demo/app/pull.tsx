@@ -1,242 +1,308 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  Alert,
-  Image,
+  ActivityIndicator,
   Pressable,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Heart } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChevronLeft, Check, Heart } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
-import { Friend } from '@/types';
+import { useToast } from '@/context/ToastContext';
+import { Avatar } from '@/components/ui/Avatar';
 
 export default function PullScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ matchmakerId?: string }>();
-  const { friends, createPullRequest } = useApp();
-  const [selectedMatchmaker, setSelectedMatchmaker] = useState<Friend | null>(
-    null,
-  );
+  const insets = useSafeAreaInsets();
+  const { showToast } = useToast();
+  const params = useLocalSearchParams<{ matchmakerId?: string | string[] }>();
+  const { friends, pullRequests, createPullRequest } = useApp();
 
-  const preselectedMatchmaker = useMemo(
-    () => friends.find((friend) => friend.id === params.matchmakerId),
-    [friends, params.matchmakerId],
-  );
+  const initialMatchmakerId = Array.isArray(params.matchmakerId)
+    ? params.matchmakerId[0]
+    : params.matchmakerId;
 
-  useEffect(() => {
-    if (preselectedMatchmaker) {
-      createPullRequest(preselectedMatchmaker);
-      Alert.alert(
-        'Request Sent!',
-        `${preselectedMatchmaker.name} will be notified to help you find a match.`,
-      );
-      router.back();
-    }
-  }, [createPullRequest, preselectedMatchmaker, router]);
+  const [selectedId, setSelectedId] = useState<string | null>(initialMatchmakerId ?? null);
+  const [isSending, setIsSending] = useState(false);
 
   const matchmakers = useMemo(
-    () => friends.filter((friend) => friend.relationshipStatus === 'not-single'),
+    () => friends.filter((f) => f.relationshipStatus === 'not-single'),
     [friends],
   );
 
-  if (preselectedMatchmaker) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Sending request...</Text>
-      </View>
-    );
-  }
+  const outgoing = useMemo(
+    () =>
+      pullRequests
+        .filter((r) => r.role === 'outgoing')
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
+    [pullRequests],
+  );
+
+  const requestStatusByMatchmaker = useMemo(() => {
+    const map = new Map<string, 'pending' | 'active' | 'completed'>();
+    outgoing.forEach((r) => {
+      const current = map.get(r.matchmaker.id);
+      if (!current) { map.set(r.matchmaker.id, r.status); return; }
+      if (current === 'completed' && r.status !== 'completed') map.set(r.matchmaker.id, r.status);
+      if (current === 'pending' && r.status === 'active') map.set(r.matchmaker.id, 'active');
+    });
+    return map;
+  }, [outgoing]);
+
+  const selectedMatchmaker = useMemo(
+    () => matchmakers.find((f) => f.id === selectedId) ?? null,
+    [matchmakers, selectedId],
+  );
+
+  const displayName = (name?: string) => name?.trim() || 'Unnamed friend';
+
+  const handleSend = async () => {
+    if (!selectedMatchmaker || isSending) return;
+    const status = requestStatusByMatchmaker.get(selectedMatchmaker.id);
+    if (status && status !== 'completed') {
+      showToast(`${displayName(selectedMatchmaker.name)} already has an active request from you`, 'info');
+      return;
+    }
+    setIsSending(true);
+    const ok = await createPullRequest(selectedMatchmaker);
+    setIsSending(false);
+    if (!ok) {
+      showToast('Could not send this request — please try again', 'error');
+      return;
+    }
+    showToast(`${displayName(selectedMatchmaker.name)} will look through their friends for you 🎉`, 'success');
+    router.replace('/home');
+  };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Who should match you?</Text>
-        <Text style={styles.subtitle}>
-          Choose a friend who knows you well to find potential matches
-        </Text>
-      </View>
+    <SafeAreaView style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-      {matchmakers.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>No matchmakers yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Invite friends who are in relationships to help match you
-          </Text>
-        </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.list}>
-          {matchmakers.map((friend) => {
-            const isSelected = selectedMatchmaker?.id === friend.id;
-            return (
-              <Pressable
-                key={friend.id}
-                style={[styles.card, isSelected && styles.cardSelected]}
-                onPress={() => setSelectedMatchmaker(friend)}
-              >
-                <Image source={{ uri: friend.photo }} style={styles.avatar} />
-                <View style={styles.cardInfo}>
-                  <Text style={styles.name}>{friend.name}</Text>
-                  {friend.bio ? (
-                    <Text style={styles.bio} numberOfLines={2}>
-                      {friend.bio}
-                    </Text>
-                  ) : null}
-                  <View style={styles.badge}>
-                    <Heart size={14} color={Colors.white} fill={Colors.white} />
-                    <Text style={styles.badgeText}>Matchmaker</Text>
-                  </View>
-                </View>
-                <View
-                  style={[
-                    styles.selector,
-                    isSelected && styles.selectorSelected,
-                  ]}
-                />
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      )}
-
-      {selectedMatchmaker && (
-        <Pressable
-          style={styles.primaryButton}
-          onPress={() => {
-            createPullRequest(selectedMatchmaker);
-            Alert.alert(
-              'Request Sent!',
-              `${selectedMatchmaker.name} will be notified to help you find a match.`,
-            );
-            router.back();
-          }}
-        >
-          <Text style={styles.primaryButtonText}>
-            Request Match from {selectedMatchmaker.name}
-          </Text>
+        <Pressable style={styles.backNav} onPress={() => router.back()}>
+          <ChevronLeft size={18} color={Colors.textSecondary} />
+          <Text style={styles.backNavText}>Back</Text>
         </Pressable>
-      )}
-    </View>
+
+        {/* Header */}
+        <View style={styles.headerCard}>
+          <View style={styles.headerIconWrap}>
+            <Heart size={18} color={Colors.brand} />
+          </View>
+          <View style={styles.headerCopy}>
+            <Text style={styles.eyebrow}>Get introduced</Text>
+            <Text style={styles.headerTitle}>Who would you like to ask?</Text>
+            <Text style={styles.headerSub}>
+              Pick one friend to look through their connections and introduce you to someone.
+            </Text>
+          </View>
+        </View>
+
+        {/* Matchmaker list */}
+        {matchmakers.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>No matchmakers available</Text>
+            <Text style={styles.emptySub}>
+              You need friends who are "not single" to ask for introductions.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.list}>
+            {matchmakers.map((f) => {
+              const isSelected = selectedId === f.id;
+              const status = requestStatusByMatchmaker.get(f.id);
+              const isBusy = status === 'pending' || status === 'active';
+
+              return (
+                <Pressable
+                  key={f.id}
+                  style={({ pressed }) => [
+                    styles.card,
+                    isSelected && styles.cardSelected,
+                    pressed && styles.cardPressed,
+                  ]}
+                  onPress={() => setSelectedId(f.id)}
+                >
+                  <Avatar photo={f.photo} name={f.name} userId={f.id} size="md" ring={isSelected} />
+                  <View style={styles.cardInfo}>
+                    <Text style={styles.cardName}>{displayName(f.name)}</Text>
+                    <Text style={styles.cardMeta}>Not single</Text>
+                  </View>
+                  {isBusy ? (
+                    <View style={[styles.statusPill, status === 'active' ? styles.pillActive : styles.pillSent]}>
+                      <Text style={[styles.pillText, status === 'active' ? styles.pillTextActive : styles.pillTextSent]}>
+                        {status === 'active' ? 'Active' : 'Sent'}
+                      </Text>
+                    </View>
+                  ) : isSelected ? (
+                    <View style={styles.checkCircle}>
+                      <Check size={14} color={Colors.white} />
+                    </View>
+                  ) : (
+                    <View style={styles.emptyCircle} />
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Floating CTA */}
+      <View style={[styles.ctaWrap, { bottom: Math.max(24, insets.bottom + 8) }]}>
+        <Pressable
+          style={[styles.ctaButton, (!selectedMatchmaker || isSending) && styles.ctaButtonDisabled]}
+          disabled={!selectedMatchmaker || isSending}
+          onPress={() => void handleSend()}
+        >
+          {isSending ? (
+            <ActivityIndicator color={Colors.white} size="small" />
+          ) : (
+            <Text style={styles.ctaText}>
+              {selectedMatchmaker
+                ? `Ask ${displayName(selectedMatchmaker.name)}`
+                : 'Ask for an introduction'}
+            </Text>
+          )}
+        </Pressable>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
+  screen: { flex: 1, backgroundColor: Colors.background },
+  backNav: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginBottom: 8, paddingVertical: 12, paddingRight: 16 },
+  backNavText: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 120,
+    gap: 14,
+    maxWidth: 680,
+    width: '100%',
+    alignSelf: 'center',
   },
-  header: {
-    padding: 24,
-    gap: 8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  list: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
+
+  headerCard: {
+    flexDirection: 'row',
     gap: 12,
+    alignItems: 'flex-start',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: Colors.brandBorder,
+    backgroundColor: Colors.brandLight,
+    padding: 18,
+  },
+  headerIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.brandBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: 2,
+  },
+  headerCopy: { flex: 1, gap: 3 },
+  eyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: Colors.brand },
+  headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, letterSpacing: -0.3 },
+  headerSub: { fontSize: 13, color: Colors.textSecondary, lineHeight: 19, marginTop: 1 },
+
+  emptyCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    padding: 20,
+    gap: 6,
+    alignItems: 'center',
+  },
+  emptyTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  emptySub: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', lineHeight: 19 },
+
+  list: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.surfaceMuted,
+    padding: 10,
+    gap: 8,
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: Colors.border,
+    padding: 12,
+    borderRadius: 14,
     backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   cardSelected: {
-    borderColor: Colors.accent,
+    borderColor: Colors.brandBorder,
+    backgroundColor: Colors.brandLight,
   },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-  },
-  cardInfo: {
-    flex: 1,
-    gap: 6,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  bio: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  badge: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  cardPressed: { opacity: 0.8 },
+  cardInfo: { flex: 1, gap: 2 },
+  cardName: { fontSize: 14, fontWeight: '700', color: Colors.text },
+  cardMeta: { fontSize: 12, color: Colors.textSecondary },
+
+  statusPill: {
+    borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: Colors.accent,
-    borderRadius: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
   },
-  badgeText: {
-    color: Colors.white,
-    fontSize: 12,
+  pillSent: { backgroundColor: Colors.brandLight, borderColor: Colors.brandBorder },
+  pillActive: { backgroundColor: '#EEF4FF', borderColor: '#C7D7F8' },
+  pillText: { fontSize: 11, fontWeight: '700' },
+  pillTextSent: { color: Colors.brand },
+  pillTextActive: { color: Colors.accent },
+
+  checkCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: Colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  selector: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
+  emptyCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1.5,
     borderColor: Colors.border,
   },
-  selectorSelected: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accent,
+
+  ctaWrap: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 24,
+    maxWidth: 640,
+    alignSelf: 'center',
+    width: '100%',
   },
-  primaryButton: {
+  ctaButton: {
     height: 56,
-    margin: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: Colors.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 24,
-    gap: 8,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
-  loadingContainer: {
-    flex: 1,
+    borderRadius: 16,
+    backgroundColor: Colors.brand,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background,
+    shadowColor: Colors.brand,
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 4,
   },
-  loadingText: {
-    color: Colors.textSecondary,
-  },
+  ctaButtonDisabled: { opacity: 0.45 },
+  ctaText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
 });

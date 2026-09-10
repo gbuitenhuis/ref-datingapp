@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Join Ref - The Dating App Where Friends Help</title>
+  <title>Join Ref - Referral-Based Dating</title>
   <style>
     * {
       margin: 0;
@@ -22,7 +22,7 @@
     }
 
     .container {
-      max-width: 420px;
+      max-width: 430px;
       width: 100%;
     }
 
@@ -42,7 +42,7 @@
     }
 
     .header-title {
-      font-size: 28px;
+      font-size: 26px;
       font-weight: 700;
       color: #1f2937;
       margin-bottom: 8px;
@@ -52,6 +52,8 @@
       font-size: 15px;
       color: #6b7280;
       line-height: 1.6;
+      max-width: 360px;
+      margin: 0 auto;
     }
 
     .loading {
@@ -82,14 +84,14 @@
     .profile-card {
       background: white;
       border-radius: 16px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 10px 28px rgba(17, 24, 39, 0.08);
       overflow: hidden;
       margin-bottom: 24px;
     }
 
     .profile-image {
       width: 100%;
-      height: 300px;
+      height: 220px;
       background: linear-gradient(135deg, #f472b6 0%, #d8b4fe 100%);
       display: flex;
       align-items: center;
@@ -100,15 +102,15 @@
     }
 
     .profile-info {
-      padding: 24px;
+      padding: 18px 20px 20px;
       text-align: center;
     }
 
     .profile-name {
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 700;
       color: #1f2937;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .profile-bio {
@@ -119,7 +121,7 @@
     }
 
     .profile-status {
-      font-size: 13px;
+      font-size: 12px;
       color: #9ca3af;
       font-weight: 500;
     }
@@ -136,6 +138,7 @@
       font-weight: 600;
       color: #1f2937;
       font-size: 13px;
+      margin-bottom: 2px;
     }
 
     .info-box-text {
@@ -254,8 +257,8 @@
   <div class="container">
     <header>
       <div class="logo">Ref</div>
-      <h1 class="header-title">You're invited!</h1>
-      <p class="header-subtitle">Join Ref, the dating app where friends help you find meaningful connections.</p>
+      <h1 class="header-title">You&apos;re invited to Ref</h1>
+      <p class="header-subtitle">Referral-based dating through trusted mutual connections.</p>
     </header>
 
     <div id="content">
@@ -270,44 +273,44 @@
     async function loadInvite() {
       const params = new URLSearchParams(window.location.search);
       const userId = params.get('userId');
-      const webBase = params.get('web') || `http://${window.location.hostname}:8081`;
+      const webBase = params.get('web') || 'https://ref-demo-three.vercel.app';
 
       if (!userId) {
-        showError('Invalid invite link', webBase);
+        showError('Invalid invite link', webBase, '');
         return;
       }
 
       try {
-        const response = await fetch(`http://localhost:4000/profiles/${userId}`);
+        const response = await fetch(`/profiles/${userId}`);
         if (!response.ok) {
-          showError('User not found', webBase);
+          showError('User not found', webBase, userId);
           return;
         }
 
         const profile = await response.json();
-        renderProfile(profile, webBase);
+        renderProfile(profile, webBase, userId);
       } catch (error) {
         console.error('Failed to load profile:', error);
-        showError('Failed to load invite', webBase);
+        showError('Failed to load invite', webBase, userId);
       }
     }
 
-    function showError(message, webBase) {
+    function showError(message, webBase, userId) {
+      const invitePath = userId
+        ? `/invite-accept?userId=${encodeURIComponent(userId)}`
+        : '/auth/register';
       document.getElementById('content').innerHTML = `
         <div class="error-container">
           <h2 class="error-title">Oops!</h2>
           <p class="error-message">${message}</p>
-          <a href="${webBase}/auth/login" class="btn btn-primary">Go to Ref</a>
+          <a href="${webBase}${invitePath}" class="btn btn-primary">Go to Ref</a>
         </div>
       `;
     }
 
-    function renderProfile(profile, webBase) {
+    function renderProfile(profile, webBase, userId) {
       const photoUrl = profile.photo || '';
       
-      const statusEmoji = profile.relationshipStatus === 'single' ? '💕' : '📍';
-      const statusText = profile.relationshipStatus === 'single' ? 'Single' : 'In a relationship';
-
       document.getElementById('content').innerHTML = `
         <div class="profile-card">
           ${photoUrl
@@ -316,24 +319,24 @@
           <div class="profile-info">
             <div class="profile-name">${profile.name}${profile.age ? ', ' + profile.age : ''}</div>
             ${profile.bio ? `<div class="profile-bio">${profile.bio}</div>` : ''}
-            <div class="profile-status">${statusEmoji} ${statusText}</div>
+            <div class="profile-status">Your friends know who could be right for you.</div>
           </div>
         </div>
 
         <div class="info-box">
-          <div class="info-box-title">How Ref works</div>
-          <div class="info-box-text">Friends help you find meaningful connections by introducing you to people they know or think you'd click with. Everyone's looking for something real.</div>
+          <div class="info-box-title">Referral-based dating</div>
+          <div class="info-box-text">No dopamine swiping. No algorithms. No weird blind dates. Ref helps people meet through trusted mutual connections.</div>
         </div>
 
         <div class="buttons">
-          <a href="https://apps.apple.com/app/ref-dating" target="_blank" class="btn btn-primary">
+          <a href="${webBase}/invite-accept?userId=${encodeURIComponent(userId)}" class="btn btn-primary">
+            ↗️ Continue on Web
+          </a>
+          <a href="https://apps.apple.com/app/ref-dating" target="_blank" class="btn btn-secondary">
             📱 Download on App Store
           </a>
-          <a href="https://play.google.com/store/apps/details?id=com.ref.dating" target="_blank" class="btn btn-primary">
+          <a href="https://play.google.com/store/apps/details?id=com.ref.dating" target="_blank" class="btn btn-secondary">
             🤖 Get on Google Play
-          </a>
-          <a href="${webBase}/auth/login" class="btn btn-secondary">
-            ↗️ Continue on Web
           </a>
         </div>
 

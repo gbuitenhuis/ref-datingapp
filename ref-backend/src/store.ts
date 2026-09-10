@@ -268,4 +268,17 @@ export const store = {
     saveState();
     return message;
   },
+
+  createUserReport(input: {
+    reporterId: string;
+    reportedUserId: string;
+    reason: 'inappropriate_behavior' | 'fake_or_spam';
+    details?: string;
+  }) {
+    return {
+      id: id(),
+      ...input,
+      createdAt: new Date().toISOString(),
+    };
+  },
 };

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/ui/Text';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Colors from '@/constants/colors';
 import { useApp } from '@/context/AppContext';
@@ -10,130 +12,126 @@ export default function IndexScreen() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setReady(true);
-    }, 100);
-
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => setReady(true), 100);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
     if (!ready || isAuthLoading) return;
-
-    // If user is logged in, route them appropriately
     if (currentUser) {
-      if (!isOnboarded) {
-        router.replace('/onboarding/welcome');
-      } else {
-        router.replace('/home');
-      }
+      router.replace(!isOnboarded ? '/onboarding/welcome' : '/home');
     }
-    // If not logged in, show landing page (this screen)
   }, [isOnboarded, isAuthLoading, currentUser, ready, router]);
 
-  // Show loading while checking auth state
-  if (isAuthLoading || !ready) {
+  if (isAuthLoading || !ready || currentUser) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color={Colors.brand} />
       </View>
     );
   }
 
-  // Show landing page if not logged in
-  if (!currentUser) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.content}>
-          <Text style={styles.title}>Welcome to Ref</Text>
-          <Text style={styles.subtitle}>Find your perfect match through friends</Text>
-          
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={() => router.push('/auth/register')}
-            >
-              <Text style={styles.primaryButtonText}>Sign Up</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={() => router.push('/auth/login')}
-            >
-              <Text style={styles.secondaryButtonText}>Sign In</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  // Fallback loading state
   return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color={Colors.primary} />
-    </View>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+
+      {/* Wordmark */}
+      <View style={styles.top}>
+        <Text style={styles.wordmark}>Ref.</Text>
+      </View>
+
+      {/* Hero */}
+      <View style={styles.middle}>
+        <Text style={styles.headline}>Meet through{'\n'}someone you trust.</Text>
+        <Text style={styles.sub}>
+          Ref is a private introduction network.{'\n'}Your friends know who could be right for you.
+        </Text>
+      </View>
+
+      {/* CTAs */}
+      <View style={styles.bottom}>
+        <Pressable style={styles.primaryButton} onPress={() => router.push('/auth/register')}>
+          <Text style={styles.primaryButtonText}>Get started</Text>
+        </Pressable>
+        <Pressable style={styles.ghostButton} onPress={() => router.push('/auth/login')}>
+          <Text style={styles.ghostButtonText}>I already have an account</Text>
+        </Pressable>
+      </View>
+
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  loader: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingHorizontal: 28,
   },
-  content: {
+
+  top: {
+    paddingTop: 20,
+  },
+  wordmark: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 1,
+    color: Colors.brand,
+  },
+
+  middle: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
+    gap: 18,
   },
-  title: {
-    fontSize: 48,
-    fontWeight: 'bold',
+  headline: {
+    fontSize: 38,
+    fontWeight: '700',
     color: Colors.text,
-    marginBottom: 16,
-    textAlign: 'center',
+    letterSpacing: -1,
+    lineHeight: 46,
   },
-  subtitle: {
-    fontSize: 18,
-    color: '#666',
-    marginBottom: 60,
-    textAlign: 'center',
+  sub: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    lineHeight: 25,
   },
-  buttonContainer: {
-    width: '100%',
-    gap: 16,
+
+  bottom: {
+    paddingBottom: 28,
+    gap: 10,
   },
   primaryButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    padding: 16,
+    height: 56,
+    backgroundColor: Colors.brand,
+    borderRadius: 14,
     alignItems: 'center',
-    minHeight: 56,
     justifyContent: 'center',
+    shadowColor: Colors.brand,
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   primaryButtonText: {
-    color: '#fff',
+    color: Colors.white,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: -0.1,
   },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: Colors.primary,
-    borderRadius: 12,
-    padding: 16,
+  ghostButton: {
+    height: 48,
     alignItems: 'center',
-    minHeight: 56,
     justifyContent: 'center',
   },
-  secondaryButtonText: {
-    color: Colors.primary,
-    fontSize: 16,
-    fontWeight: '600',
+  ghostButtonText: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

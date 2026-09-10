@@ -1,68 +1,74 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
+  StyleSheet,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Text } from '@/components/ui/Text';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useApp } from '@/context/AppContext';
 import Colors from '@/constants/colors';
+import { Input } from '@/components/ui/Input';
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ inviteUserId?: string | string[] }>();
   const { register } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const validatePassword = (pwd: string): { valid: boolean; message?: string } => {
-    if (pwd.length < 8) return { valid: false, message: 'At least 8 characters' };
-    if (!/[A-Z]/.test(pwd)) return { valid: false, message: 'At least 1 uppercase letter' };
-    if (!/[a-z]/.test(pwd)) return { valid: false, message: 'At least 1 lowercase letter' };
-    if (!/[0-9]/.test(pwd)) return { valid: false, message: 'At least 1 number' };
-    if (!/[!@#$%^&*]/.test(pwd)) return { valid: false, message: 'At least 1 special character (!@#$%^&*)' };
-    return { valid: true };
-  };
+  const inviteUserId = Array.isArray(params.inviteUserId)
+    ? params.inviteUserId[0]
+    : params.inviteUserId;
+
+  const isFormComplete = useMemo(
+    () => email.trim().length > 0 && password.trim().length > 0,
+    [email, password],
+  );
 
   const handleRegister = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+    setError('');
+    const trimEmail = email.trim().toLowerCase();
+    const trimPass = password.trim();
+    if (!trimEmail || !trimPass) {
+      setError('Please fill in your email and password.');
       return;
     }
-
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.valid) {
-      Alert.alert('Weak Password', passwordValidation.message);
+    if (trimPass.length < 6) {
+      setError('Password must be at least 6 characters.');
       return;
     }
-
     setLoading(true);
     try {
-      const success = await register(email.trim(), password);
-      if (success) {
-        router.replace('/');
-      } else {
-        Alert.alert(
-          'Registration Failed', 
-          'This email is already registered. Please login or use a different email.'
+      const result = await register(trimEmail, trimPass);
+      if (result) {
+        router.replace(
+          inviteUserId
+            ? { pathname: '/onboarding/welcome', params: { inviteUserId } }
+            : '/onboarding/welcome',
         );
+        return;
       }
-    } catch (error) {
-      Alert.alert('Error', 'Unable to connect to the server. Please try again later.');
+      setError('Could not create account. This email may already be registered.');
+    } catch {
+      setError('Could not connect to the server. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const goToLogin = () => {
-    router.push('/auth/login');
+    if (inviteUserId) {
+      router.push({ pathname: '/auth/login', params: { inviteUserId } });
+    } else {
+      router.push('/auth/login');
+    }
   };
 
   return (
@@ -71,61 +77,63 @@ export default function RegisterScreen() {
       style={styles.container}
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.content}>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join Ref and find your match</Text>
+          <View style={styles.header}>
+            <Text style={styles.title}>Create account</Text>
+            <Text style={styles.subtitle}>
+              Join through a trusted mutual connection.
+            </Text>
+          </View>
 
           <View style={styles.form}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="your.email@example.com"
-                placeholderTextColor="#999"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                autoComplete="email"
-                editable={!loading}
-              />
-            </View>
+            <Input
+              label="Email"
+              placeholder="your@email.com"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              autoComplete="email"
+              editable={!loading}
+            />
+            <Input
+              label="Password"
+              placeholder="At least 6 characters"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              autoComplete="password-new"
+              editable={!loading}
+              error={error}
+            />
+          </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="At least 6 characters"
-                placeholderTextColor="#999"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoComplete="password-new"
-                editable={!loading}
-              />
-            </View>
+          <Pressable
+            style={[
+              styles.primaryButton,
+              (!isFormComplete || loading) && styles.buttonDisabled,
+            ]}
+            onPress={handleRegister}
+            disabled={!isFormComplete || loading}
+          >
+            {loading ? (
+              <ActivityIndicator color={Colors.white} size="small" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Create account</Text>
+            )}
+          </Pressable>
 
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleRegister}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Create Account</Text>
-              )}
-            </TouchableOpacity>
-
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>Already have an account? </Text>
-              <TouchableOpacity onPress={goToLogin} disabled={loading}>
-                <Text style={styles.linkText}>Sign In</Text>
-              </TouchableOpacity>
-            </View>
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Already have an account? </Text>
+            <Pressable onPress={goToLogin} disabled={loading} style={styles.footerLink}>
+              <Text style={styles.link}>Sign in</Text>
+            </Pressable>
           </View>
         </View>
       </ScrollView>
@@ -134,81 +142,55 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  scroll: { flexGrow: 1 },
   content: {
     flex: 1,
     justifyContent: 'center',
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+    gap: 24,
+    maxWidth: 480,
+    width: '100%',
+    alignSelf: 'center',
   },
+  header: { gap: 6 },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
+    fontSize: 30,
+    fontWeight: '700',
     color: Colors.text,
-    marginBottom: 8,
-    textAlign: 'center',
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 40,
-    textAlign: 'center',
+    fontSize: 15,
+    color: Colors.textSecondary,
+    lineHeight: 22,
   },
-  form: {
-    width: '100%',
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: Colors.text,
-  },
-  button: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    padding: 16,
+  form: { gap: 16 },
+  primaryButton: {
+    height: 56,
+    backgroundColor: Colors.brand,
+    borderRadius: 14,
     alignItems: 'center',
-    marginTop: 12,
-    minHeight: 56,
     justifyContent: 'center',
+    shadowColor: Colors.brand,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
+  buttonDisabled: { opacity: 0.45 },
+  primaryButtonText: {
+    color: Colors.white,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 24,
+    alignItems: 'center',
   },
-  footerText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  linkText: {
-    fontSize: 14,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
+  footerText: { fontSize: 14, color: Colors.textSecondary },
+  footerLink: { paddingVertical: 12, paddingHorizontal: 4 },
+  link: { fontSize: 14, color: Colors.brand, fontWeight: '700' },
 });

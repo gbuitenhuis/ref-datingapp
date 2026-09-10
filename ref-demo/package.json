@@ -5,15 +5,18 @@
   "scripts": {
     "start": "expo start",
     "build": "expo export -p web",
+    "qa:invite": "node scripts/invite-e2e.mjs",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo-google-fonts/poppins": "^0.4.1",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "expo": "~54.0.33",
     "expo-clipboard": "~8.0.7",
     "expo-font": "^14.0.11",
+    "expo-haptics": "~15.0.8",
     "expo-image-picker": "~17.0.8",
     "expo-linking": "^8.0.11",
     "expo-router": "~6.0.13",
@@ -31,6 +34,7 @@
   "devDependencies": {
     "@types/react": "~19.1.0",
     "babel-preset-expo": "^54.0.10",
+    "playwright": "^1.58.2",
     "typescript": "~5.9.2"
   },
   "private": true

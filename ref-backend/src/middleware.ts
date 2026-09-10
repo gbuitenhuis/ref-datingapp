@@ -33,17 +33,25 @@ export const validateToken = (req: Request, res: Response, next: NextFunction) =
 };
 
 // Rate limiting middleware
-export const createRateLimiter = () => {
-  const windowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000');
-  const maxRequests = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100');
+type RateLimiterConfig = {
+  windowMs?: number;
+  max?: number;
+  message?: string;
+};
 
-  return rateLimit({
+export const createRateLimiter = (config: RateLimiterConfig = {}) => {
+  const windowMs = config.windowMs ?? parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000');
+  const maxRequests = config.max ?? parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100');
+
+  const options = {
     windowMs,
     max: maxRequests,
-    message: 'Too many requests, please try again later',
+    message: config.message ?? 'Too many requests, please try again later',
     standardHeaders: true,
     legacyHeaders: false,
-  });
+  };
+
+  return rateLimit(options);
 };
 
 // Create JWT token

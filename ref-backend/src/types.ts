@@ -1,5 +1,7 @@
 export type RelationshipStatus = 'single' | 'not-single';
 export type SwipeDirection = 'like' | 'pass';
+export type Gender = 'man' | 'woman' | 'non-binary';
+export type LookingFor = 'men' | 'women' | 'everyone';
 
 export interface User {
   id: string;
@@ -10,6 +12,8 @@ export interface User {
   photo?: string;
   bio?: string;
   age?: number;
+  gender?: Gender;
+  lookingFor?: LookingFor;
   createdAt: string;
 }
 
@@ -41,4 +45,6 @@ export interface PublicUser {
   photo?: string;
   bio?: string;
   age?: number;
+  gender?: Gender;
+  lookingFor?: LookingFor;
 }

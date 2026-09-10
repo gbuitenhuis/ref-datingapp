@@ -49,6 +49,44 @@ CREATE TABLE IF NOT EXISTS public.pull_requests (
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
+-- Push requests: matchmaker chooses one target and one-or-more candidates.
+CREATE TABLE IF NOT EXISTS public.push_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  matchmaker_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  target_user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  status TEXT NOT NULL CHECK (status IN ('sent', 'completed')) DEFAULT 'sent',
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.push_suggestions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  push_request_id UUID NOT NULL REFERENCES public.push_requests(id) ON DELETE CASCADE,
+  matchmaker_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  target_user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  candidate_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  target_status TEXT NOT NULL CHECK (target_status IN ('pending', 'accepted', 'declined')) DEFAULT 'pending',
+  candidate_status TEXT NOT NULL CHECK (candidate_status IN ('pending', 'accepted', 'declined')) DEFAULT 'pending',
+  final_status TEXT NOT NULL CHECK (final_status IN ('pending', 'matched', 'declined')) DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  UNIQUE(push_request_id, candidate_id)
+);
+
+-- Pull suggestions: one pull request can have multiple suggested candidates.
+CREATE TABLE IF NOT EXISTS public.pull_suggestions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pull_request_id UUID NOT NULL REFERENCES public.pull_requests(id) ON DELETE CASCADE,
+  requester_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  candidate_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  matchmaker_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  note_to_requester TEXT,
+  note_to_candidate TEXT,
+  requester_status TEXT NOT NULL CHECK (requester_status IN ('pending', 'accepted', 'declined')) DEFAULT 'pending',
+  candidate_status TEXT NOT NULL CHECK (candidate_status IN ('pending', 'accepted', 'declined')) DEFAULT 'pending',
+  final_status TEXT NOT NULL CHECK (final_status IN ('pending', 'matched', 'declined')) DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  UNIQUE(pull_request_id, candidate_id)
+);
+
 -- Create messages table
 CREATE TABLE IF NOT EXISTS public.messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -68,6 +106,15 @@ CREATE INDEX IF NOT EXISTS idx_friends_requester ON public.friends(requester_id)
 CREATE INDEX IF NOT EXISTS idx_friends_addressee ON public.friends(addressee_id);
 CREATE INDEX IF NOT EXISTS idx_pull_requests_requester ON public.pull_requests(requester_id);
 CREATE INDEX IF NOT EXISTS idx_pull_requests_matchmaker ON public.pull_requests(matchmaker_id);
+CREATE INDEX IF NOT EXISTS idx_push_requests_matchmaker ON public.push_requests(matchmaker_id);
+CREATE INDEX IF NOT EXISTS idx_push_requests_target ON public.push_requests(target_user_id);
+CREATE INDEX IF NOT EXISTS idx_push_suggestions_request ON public.push_suggestions(push_request_id);
+CREATE INDEX IF NOT EXISTS idx_push_suggestions_target ON public.push_suggestions(target_user_id);
+CREATE INDEX IF NOT EXISTS idx_push_suggestions_candidate ON public.push_suggestions(candidate_id);
+CREATE INDEX IF NOT EXISTS idx_pull_suggestions_pull_request ON public.pull_suggestions(pull_request_id);
+CREATE INDEX IF NOT EXISTS idx_pull_suggestions_requester ON public.pull_suggestions(requester_id);
+CREATE INDEX IF NOT EXISTS idx_pull_suggestions_candidate ON public.pull_suggestions(candidate_id);
+CREATE INDEX IF NOT EXISTS idx_pull_suggestions_matchmaker ON public.pull_suggestions(matchmaker_id);
 
 -- Enable Row Level Security
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -76,6 +123,9 @@ ALTER TABLE public.matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.friends ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pull_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pull_suggestions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.push_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.push_suggestions ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for profiles (users can read all, update only their own)
 CREATE POLICY "Profiles are viewable by everyone" ON public.profiles
@@ -111,6 +161,42 @@ CREATE POLICY "Users can view own pull requests" ON public.pull_requests
 
 CREATE POLICY "Users can create own pull requests" ON public.pull_requests
   FOR INSERT WITH CHECK (auth.uid() = requester_id);
+
+CREATE POLICY "Users can view related push requests" ON public.push_requests
+  FOR SELECT USING (auth.uid() = matchmaker_id OR auth.uid() = target_user_id);
+
+CREATE POLICY "Matchmakers can create push requests" ON public.push_requests
+  FOR INSERT WITH CHECK (auth.uid() = matchmaker_id);
+
+CREATE POLICY "Users can update related push requests" ON public.push_requests
+  FOR UPDATE USING (auth.uid() = matchmaker_id OR auth.uid() = target_user_id);
+
+CREATE POLICY "Users can view related push suggestions" ON public.push_suggestions
+  FOR SELECT USING (
+    auth.uid() = matchmaker_id OR auth.uid() = target_user_id OR auth.uid() = candidate_id
+  );
+
+CREATE POLICY "Matchmakers can create push suggestions" ON public.push_suggestions
+  FOR INSERT WITH CHECK (auth.uid() = matchmaker_id);
+
+CREATE POLICY "Participants can update push suggestions" ON public.push_suggestions
+  FOR UPDATE USING (
+    auth.uid() = matchmaker_id OR auth.uid() = target_user_id OR auth.uid() = candidate_id
+  );
+
+-- RLS Policies for pull suggestions
+CREATE POLICY "Users can view related pull suggestions" ON public.pull_suggestions
+  FOR SELECT USING (
+    auth.uid() = requester_id OR auth.uid() = candidate_id OR auth.uid() = matchmaker_id
+  );
+
+CREATE POLICY "Matchmakers can create pull suggestions" ON public.pull_suggestions
+  FOR INSERT WITH CHECK (auth.uid() = matchmaker_id);
+
+CREATE POLICY "Participants can update pull suggestions" ON public.pull_suggestions
+  FOR UPDATE USING (
+    auth.uid() = requester_id OR auth.uid() = candidate_id OR auth.uid() = matchmaker_id
+  );
 
 -- RLS Policies for messages (users can see messages in their matches)
 CREATE POLICY "Users can view messages in their matches" ON public.messages

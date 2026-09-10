@@ -25,6 +25,11 @@ Secure TypeScript/Express backend for the Ref dating app. Uses Supabase PostgreS
 - `POST /friends/add` - Add friend
 - `POST /push` - Create match for friends
 - `POST /pull` - Request match
+- `GET /pull/requests/:userId` - Pull request inbox
+- `POST /pull/respond` - Start/complete pull request
+- `POST /pull/suggestions` - Matchmaker suggests candidate in a pull request
+- `GET /pull/suggestions/:userId` - List pull suggestions for user
+- `POST /pull/suggestions/respond` - Requester/candidate accept or decline suggestion
 - `POST /chats/:matchId/messages` - Send message
 
 **Public Read**
@@ -72,7 +77,16 @@ Uses Supabase PostgreSQL with these tables:
 - `friends` - Friend relationships
 - `messages` - Chat messages
 - `pull_requests` - Matchmaking requests
+- `pull_suggestions` - Multiple suggestions per pull request (migration required)
 - `auth.users` - Supabase auth
+
+### Pull Suggestions Migration
+
+Run this SQL in Supabase SQL editor before using suggestion endpoints:
+
+```sql
+-- file: migrations/2026-03-05-pull-suggestions.sql
+```
 
 ## 🧪 Testing
 
