@@ -5,7 +5,6 @@ import {
   Alert,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -98,7 +97,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <View style={styles.container}>
 
         {/* Header */}
         <View style={styles.header}>
@@ -107,7 +106,6 @@ export default function HomeScreen() {
             <Text style={styles.name}>{currentUser.name ?? 'friend'} 👋</Text>
           </View>
           <View style={styles.headerActions}>
-            {/* Bell — fixed: now navigates to inbox */}
             <Pressable style={styles.iconButton} onPress={() => router.push('/inbox')}>
               <Bell size={20} color={Colors.text} />
             </Pressable>
@@ -125,20 +123,16 @@ export default function HomeScreen() {
         {/* Profile completeness prompt */}
         {profilePromptVisible && (
           <View style={styles.profilePrompt}>
-            <View style={styles.profilePromptCopy}>
+            <View style={styles.profilePromptLeft}>
               <Text style={styles.profilePromptTitle}>Complete your profile</Text>
               <Text style={styles.profilePromptText}>
-                {!currentUser.photo && !currentUser.bio
-                  ? 'Add a photo and a short bio so friends can introduce you.'
-                  : !currentUser.photo
-                    ? 'Add a profile photo so people know who you are.'
-                    : 'Add a short bio to help friends introduce you.'}
+                {!currentUser.photo ? 'Add a photo so people know who you are.' : 'Add a short bio to help friends introduce you.'}
               </Text>
             </View>
             <View style={styles.profilePromptActions}>
               <Pressable
                 style={styles.profilePromptBtn}
-                onPress={() => { setMenuVisible(false); router.push('/edit-profile'); }}
+                onPress={() => { router.push('/edit-profile'); }}
               >
                 <Text style={styles.profilePromptBtnText}>Complete</Text>
               </Pressable>
@@ -163,9 +157,7 @@ export default function HomeScreen() {
         {connectedName ? (
           <View style={styles.successBanner}>
             <Text style={styles.successTitle}>You're now friends with {connectedName} 🎉</Text>
-            <Text style={styles.successText}>
-              You can now make introductions through each other.
-            </Text>
+            <Text style={styles.successText}>You can now make introductions through each other.</Text>
             <Pressable
               style={styles.successButton}
               onPress={() => router.push({ pathname: '/friends', params: { connected: connectedName } })}
@@ -174,6 +166,18 @@ export default function HomeScreen() {
             </Pressable>
           </View>
         ) : null}
+
+        {/* Invite — above the pills */}
+        <View style={styles.inviteSection}>
+          <View style={styles.inviteCopy}>
+            <Text style={styles.inviteTitle}>Invite friends</Text>
+            <Text style={styles.inviteText}>The more people you know on Ref, the more introductions you can make.</Text>
+          </View>
+          <Pressable style={styles.inviteButton} onPress={() => router.push('/invite')}>
+            <Link size={15} color={Colors.white} />
+            <Text style={styles.inviteButtonText}>Invite</Text>
+          </Pressable>
+        </View>
 
         {/* Core actions */}
         <View style={styles.coreGrid}>
@@ -196,7 +200,7 @@ export default function HomeScreen() {
               <Heart size={22} color={Colors.white} fill={Colors.white} />
             </View>
             <Text style={styles.coreTitle}>Get introduced</Text>
-            <Text style={styles.coreSub}>Ask a friend to introduce you to someone from their circle.</Text>
+            <Text style={styles.coreSub}>Ask a friend to set you up with someone from their circle.</Text>
           </Pressable>
         </View>
 
@@ -210,9 +214,7 @@ export default function HomeScreen() {
               <Users size={17} color={Colors.brand} />
               <Text style={styles.secondaryTitle}>Friends</Text>
             </View>
-            <Text style={styles.secondaryText}>
-              Your circle and who can introduce you.
-            </Text>
+            <Text style={styles.secondaryText}>Your circle and who can introduce you.</Text>
           </Pressable>
 
           <Pressable
@@ -223,34 +225,11 @@ export default function HomeScreen() {
               <Bell size={17} color={Colors.brand} />
               <Text style={styles.secondaryTitle}>For You</Text>
             </View>
-            <Text style={styles.secondaryText}>
-              Introductions, matches, and requests.
-            </Text>
+            <Text style={styles.secondaryText}>Introductions, matches, and requests.</Text>
           </Pressable>
         </View>
 
-        {/* About Ref — inline, always visible */}
-        <View style={styles.aboutCard}>
-          <Text style={styles.aboutWordmark}>Ref.</Text>
-          <Text style={styles.aboutText}>
-            People make better matches than algorithms. Your friends know who could be right for you — introductions made through someone you trust.
-          </Text>
-        </View>
-
-        {/* Invite section */}
-        <View style={styles.inviteSection}>
-          <View style={styles.inviteCopy}>
-            <Text style={styles.inviteTitle}>Invite friends</Text>
-            <Text style={styles.inviteText}>
-              The more people you know on Ref, the more introductions you can make.
-            </Text>
-          </View>
-          <Pressable style={styles.inviteButton} onPress={() => router.push('/invite')}>
-            <Link size={17} color={Colors.white} />
-            <Text style={styles.inviteButtonText}>Invite</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
+      </View>
 
       <AppTabBar />
 
@@ -335,10 +314,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   loader: { flex: 1, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center' },
   container: {
+    flex: 1,
     paddingHorizontal: 22,
     paddingTop: 20,
-    paddingBottom: 120,
-    gap: 20,
+    paddingBottom: 16,
+    gap: 14,
     maxWidth: 680,
     width: '100%',
     alignSelf: 'center',
@@ -361,30 +341,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Profile prompt
+  // Profile prompt — compact inline bar
   profilePrompt: {
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 18,
-    padding: 16,
-    gap: 12,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  profilePromptCopy: { gap: 4 },
-  profilePromptTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
-  profilePromptText: { fontSize: 13, color: Colors.textSecondary, lineHeight: 19 },
-  profilePromptActions: { flexDirection: 'row', gap: 10 },
+  profilePromptLeft: { flex: 1, gap: 1 },
+  profilePromptTitle: { fontSize: 13, fontWeight: '700', color: Colors.text },
+  profilePromptText: { fontSize: 12, color: Colors.textSecondary, lineHeight: 17 },
+  profilePromptActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   profilePromptBtn: {
-    height: 36, paddingHorizontal: 16, borderRadius: 10,
+    height: 30, paddingHorizontal: 12, borderRadius: 8,
     backgroundColor: Colors.brand, justifyContent: 'center',
   },
-  profilePromptBtnText: { fontSize: 13, fontWeight: '700', color: Colors.white },
+  profilePromptBtnText: { fontSize: 12, fontWeight: '700', color: Colors.white },
   profilePromptDismiss: {
-    height: 36, paddingHorizontal: 14, borderRadius: 10,
+    height: 30, paddingHorizontal: 10, borderRadius: 8,
     borderWidth: 1, borderColor: Colors.border,
     justifyContent: 'center',
   },
-  profilePromptDismissText: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
+  profilePromptDismissText: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
 
   // Success banner
   successBanner: {
@@ -408,10 +391,9 @@ const styles = StyleSheet.create({
   successButtonText: { fontSize: 13, fontWeight: '700', color: Colors.white },
 
   // Core grid
-  coreGrid: { flexDirection: 'row', gap: 14 },
+  coreGrid: { flexDirection: 'row', gap: 14, flex: 1 },
   coreCard: {
     flex: 1,
-    minHeight: 180,
     padding: 20,
     borderRadius: 24,
     backgroundColor: Colors.surface,
@@ -445,43 +427,31 @@ const styles = StyleSheet.create({
   secondaryTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
   secondaryText: { fontSize: 13, lineHeight: 19, color: Colors.textSecondary },
 
-  // About Ref inline
-  aboutCard: {
-    padding: 20,
-    borderRadius: 20,
-    backgroundColor: Colors.brandLight,
-    borderWidth: 1,
-    borderColor: Colors.brandBorder,
-    gap: 6,
-  },
-  aboutWordmark: { fontSize: 12, fontWeight: '800', letterSpacing: 1, color: Colors.brand },
-  aboutText: { fontSize: 14, lineHeight: 22, color: Colors.text, fontWeight: '500' },
-
-  // Invite
+  // Invite — compact
   inviteSection: {
-    padding: 22,
-    borderRadius: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
     backgroundColor: Colors.brandLight,
     borderWidth: 1,
     borderColor: Colors.brandBorder,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 16,
+    gap: 12,
   },
-  inviteCopy: { flex: 1, gap: 4 },
-  inviteTitle: { fontSize: 17, fontWeight: '700', color: Colors.text },
-  inviteText: { fontSize: 13, lineHeight: 19, color: Colors.textSecondary },
+  inviteCopy: { flex: 1, gap: 2 },
+  inviteTitle: { fontSize: 14, fontWeight: '700', color: Colors.text },
+  inviteText: { fontSize: 12, lineHeight: 17, color: Colors.textSecondary },
   inviteButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    height: 44,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    gap: 6,
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: 10,
     backgroundColor: Colors.brand,
   },
-  inviteButtonText: { fontSize: 14, fontWeight: '700', color: Colors.white },
+  inviteButtonText: { fontSize: 13, fontWeight: '700', color: Colors.white },
 
   // Modals
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 24 },
