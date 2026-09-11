@@ -620,11 +620,37 @@ export const AppContext = ({ children }: { children: ReactNode }) => {
     setAuthToken(null);
   };
 
+  // Resize + compress image using canvas before uploading.
+  // Keeps payload well under Vercel's 4.5 MB serverless body limit.
+  const resizeBlob = (blob: Blob, maxPx = 900, quality = 0.78): Promise<Blob> =>
+    new Promise((resolve) => {
+      const img = new window.Image();
+      const url = URL.createObjectURL(blob);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+        canvas.toBlob((b) => resolve(b ?? blob), 'image/jpeg', quality);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(blob); };
+      img.src = url;
+    });
+
   const uploadPhoto = async (localUri: string): Promise<string | null> => {
     try {
       const response = await fetch(localUri);
-      const blob = await response.blob();
-      const mimeType = (blob.type || 'image/jpeg') as string;
+      let blob = await response.blob();
+
+      // Resize client-side so base64 payload stays under Vercel's 4.5 MB limit
+      if (typeof document !== 'undefined') {
+        blob = await resizeBlob(blob);
+      }
+
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -637,7 +663,7 @@ export const AppContext = ({ children }: { children: ReactNode }) => {
 
       const result = await apiRequest<{ url: string }>('/upload/photo', {
         method: 'POST',
-        body: JSON.stringify({ base64, mimeType }),
+        body: JSON.stringify({ base64, mimeType: 'image/jpeg' }),
       });
       return result?.url ?? null;
     } catch (e) {
