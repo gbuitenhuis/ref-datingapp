@@ -601,13 +601,19 @@ app.post('/upload/photo', writeLimiter, validateToken, async (req, res) => {
   const ext = mimeType.split('/')[1];
   const fileName = `${req.userId}-${Date.now()}.${ext}`;
 
+  // Ensure bucket exists (serverless cold starts can't rely on app.listen callback)
+  const { data: buckets } = await supabase.storage.listBuckets();
+  if (!buckets?.some((b) => b.name === 'avatars')) {
+    await supabase.storage.createBucket('avatars', { public: true, fileSizeLimit: 10485760 });
+  }
+
   const { data, error } = await supabase.storage
     .from('avatars')
     .upload(fileName, buffer, { contentType: mimeType, upsert: true });
 
   if (error) {
     console.error('Storage upload error:', error);
-    return res.status(500).json({ error: 'Could not upload photo' });
+    return res.status(500).json({ error: 'Could not upload photo', detail: error.message });
   }
 
   const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(data.path);
